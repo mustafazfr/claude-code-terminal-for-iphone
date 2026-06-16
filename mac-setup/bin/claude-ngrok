@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+#
+# claude-ngrok
+#
+# SSH'ı (port 22) ngrok ile internete güvenli açar ve uygulamaya gireceğin
+# Host + Port adresini gösterir. caffeinate ile Mac uyumaz.
+#
+# Tek seferlik ön koşullar:
+#   1) brew install ngrok
+#   2) ngrok.com'dan ÜCRETSİZ hesap aç → authtoken'ı al → şunu çalıştır:
+#        ngrok config add-authtoken <TOKEN>
+#   3) GÜVENLİK: önce uygulamadaki SSH anahtarını Mac'e ekle, sonra harden-ssh.sh çalıştır.
+#
+set -euo pipefail
+export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
+
+command -v ngrok >/dev/null 2>&1 || { echo "❌ ngrok yok. Kur: brew install ngrok"; exit 1; }
+if ! ngrok config check >/dev/null 2>&1; then
+  echo "❌ ngrok authtoken ayarlı değil."
+  echo "   ngrok.com'dan ücretsiz hesap aç, authtoken'ı kopyala ve şunu çalıştır:"
+  echo "     ngrok config add-authtoken <TOKEN>"
+  exit 1
+fi
+
+echo "🚀 ngrok başlatılıyor (SSH port 22)…"
+# Önceki ngrok'u kapat, yenisini caffeinate ile arka planda başlat.
+pkill -f "ngrok tcp 22" 2>/dev/null || true
+nohup caffeinate -dis ngrok tcp 22 --log stdout > /tmp/claude-ngrok.log 2>&1 &
+
+# Adresin local API'de belirmesini bekle.
+ADDR=""
+for i in $(seq 1 15); do
+  sleep 1
+  ADDR=$(curl -s http://localhost:4040/api/tunnels 2>/dev/null \
+    | python3 -c "import sys,json
+try:
+    t=json.load(sys.stdin).get('tunnels',[])
+    print(t[0]['public_url'] if t else '')
+except Exception:
+    print('')" 2>/dev/null)
+  [ -n "$ADDR" ] && break
+done
+
+if [ -z "$ADDR" ]; then
+  echo "⚠️  Adres alınamadı. Log: /tmp/claude-ngrok.log"
+  exit 1
+fi
+
+# tcp://0.tcp.eu.ngrok.io:18923  →  host + port ayıkla
+HOSTPORT="${ADDR#tcp://}"
+HOST="${HOSTPORT%:*}"
+PORT="${HOSTPORT##*:}"
+
+echo ""
+echo "✅ Hazır! Uygulamada (ClaudeRemote → Yeni Mac ekle) şunları gir:"
+echo "   ┌────────────────────────────────────────────"
+echo "   │ Host        : $HOST"
+echo "   │ Port        : $PORT"
+echo "   │ Kullanıcı   : $(whoami)"
+echo "   │ Giriş yöntemi: SSH Anahtarı"
+echo "   └────────────────────────────────────────────"
+echo ""
+echo "ℹ️  ngrok arka planda çalışıyor. Durdurmak için: pkill -f 'ngrok tcp 22'"
+echo "ℹ️  Ücretsiz ngrok'ta bu adres yeniden başlatınca DEĞİŞİR; o zaman uygulamada güncelle."

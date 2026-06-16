@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+#
+# claude-notify "<mesaj>" ["<başlık>"]
+#
+# Telefonuna ntfy üzerinden push bildirimi gönderir. Claude Code hook'larından
+# çağrılır (Claude izin sorduğunda / iş bittiğinde). Mac tarafında uygulama YOK;
+# bu sadece küçük bir curl sarmalayıcısı.
+#
+# Konu adını gizli tut: ntfy.sh'te konuya kim abone olursa bildirimleri görür.
+# Yapılandırma:  ~/.config/claude-remote/ntfy.conf
+#   NTFY_TOPIC="rastgele-uzun-gizli-konu-adi-1234"
+#   NTFY_SERVER="https://ntfy.sh"   # (opsiyonel; self-host edebilirsin)
+#
+set -euo pipefail
+
+CONF="$HOME/.config/claude-remote/ntfy.conf"
+[ -f "$CONF" ] && . "$CONF"
+
+TOPIC="${NTFY_TOPIC:-}"
+SERVER="${NTFY_SERVER:-https://ntfy.sh}"
+
+if [ -z "$TOPIC" ]; then
+  # Yapılandırma yoksa sessizce çık ki hook Claude'u bloklamasın.
+  echo "claude-notify: NTFY_TOPIC ayarlı değil ($CONF) — bildirim atlanıyor." >&2
+  exit 0
+fi
+
+MSG="${1:-$(cat)}"
+TITLE="${2:-Claude Code}"
+
+# -f: HTTP hatasında sessiz başarısız, -m 10: 10 sn timeout. Hook'u asla bloklama.
+curl -fsS -m 10 \
+  -H "Title: ${TITLE}" \
+  -H "Tags: robot" \
+  -H "Priority: high" \
+  -d "${MSG}" \
+  "${SERVER}/${TOPIC}" >/dev/null 2>&1 || true

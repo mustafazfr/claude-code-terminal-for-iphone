@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+#
+# claude-tmux [session]
+#
+# Adı verilen tmux oturumuna bağlanır, yoksa oluşturur. Claude'u OTOMATİK
+# BAŞLATMAZ — seni home dizininde normal bir kabuğa bırakır. Kontrol sende:
+# istediğinde `claude` yazıp başlatırsın.
+#
+# Neden tmux?  SSH bağlantısı kopunca (telefon uykuya geçti, ağ değişti) çıplak
+#   bir kabuk SIGHUP alır ve içindekiler ölür. tmux server Mac'te ayrı çalıştığından
+#   bağlantı kopması yalnızca "izleyiciyi" ayırır; oturum (ve Claude) yaşamaya devam eder.
+# Neden caffeinate?  MacBook'u uyutmaz; oturum açık olduğu sürece iş devam eder.
+#
+set -euo pipefail
+
+SESSION="${1:-main}"
+
+# SSH (login olmayan) kabuklarda da tmux/claude/node PATH'te olsun:
+export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
+
+# Uzak (SSH) oturumlar Mac'in Keychain'ine erişemediği için Claude'un girişini
+# API anahtarıyla sağlıyoruz. Bu dosya varsa ANTHROPIC_API_KEY'i yükler.
+# (Mac'in kendi Terminal'ini etkilemez — sadece bu script'le açılan oturumlar.)
+[ -f "$HOME/.config/claude-remote/env" ] && . "$HOME/.config/claude-remote/env"
+
+# -A: oturum varsa ona bağlan, yoksa oluştur. caffeinate Mac'i uyutmaz.
+# Login shell → home dizininde, profilin yüklü, claude PATH'te. claude'u SEN başlatırsın.
+exec tmux new-session -A -s "$SESSION" "caffeinate -dis ${SHELL:-/bin/zsh} -l"

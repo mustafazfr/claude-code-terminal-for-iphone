@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+#
+# claude-sessions [adet]
+#
+# Claude Code'un geçmiş sohbetlerini listeler (en yeni önce), boru-ayraçlı:
+#   <oturum-id>|<cwd>|<epoch>|<özet>
+# Uygulamadaki "Sohbetler" ekranı bunu çalıştırıp ayrıştırır.
+# Bir sohbete devam: cd <cwd> && claude --resume <oturum-id>
+#
+set -euo pipefail
+LIMIT="${1:-40}"
+PROJ="$HOME/.claude/projects"
+[ -d "$PROJ" ] || exit 0
+
+python3 - "$PROJ" "$LIMIT" <<'PY'
+import os, sys, json, glob
+
+proj, limit = sys.argv[1], int(sys.argv[2])
+
+# Gerçek kullanıcı sohbeti olmayan iç sistem oturumlarını ele.
+INTERNAL_PREFIXES = (
+    "Apply maximum non-destructive compression",
+    "You are summarizing a Claude Code session",
+    "Analyze this codebase and create",
+)
+import re
+def clean_summary(s):
+    # Slash-komut / yerel-komut etiketlerini ayıkla, ilk anlamlı metni al.
+    s = re.sub(r"<[^>]+>", " ", s)            # <local-command-caveat> vb.
+    s = re.sub(r"Caveat:.*?unless the user explicitly asks you to\.?", " ", s, flags=re.S)
+    return " ".join(s.split())
+
+rows = []
+for f in glob.glob(os.path.join(proj, "*", "*.jsonl")):
+    try:
+        sid = os.path.splitext(os.path.basename(f))[0]
+        mtime = os.path.getmtime(f)
+        cwd, summary = "", ""
+        with open(f, "r", errors="ignore") as fh:
+            for line in fh:
+                if not line.strip():
+                    continue
+                try:
+                    o = json.loads(line)
+                except Exception:
+                    continue
+                if not cwd and isinstance(o.get("cwd"), str):
+                    cwd = o["cwd"]
+                if not summary and o.get("type") == "user":
+                    m = o.get("message", {}) or {}
+                    c = m.get("content", "")
+                    if isinstance(c, list):
+                        c = " ".join(p.get("text", "") for p in c
+                                     if isinstance(p, dict) and p.get("type") == "text")
+                    if isinstance(c, str) and c.strip():
+                        summary = c.strip()
+                if cwd and summary:
+                    break
+        if not summary:
+            continue  # gerçek kullanıcı mesajı olmayanları atla
+        # geçici/iç dizinlerdeki oturumları atla (memory/remember sistemi vb.)
+        if cwd.startswith(("/private", "/tmp", "/var")):
+            continue
+        if summary.startswith(INTERNAL_PREFIXES):
+            continue
+        summary = clean_summary(summary)
+        if not summary:
+            continue
+        summary = summary[:80].replace("|", "/")
+        cwd = cwd.replace("|", "/")
+        rows.append((mtime, sid, cwd, summary))
+    except Exception:
+        continue
+
+rows.sort(reverse=True)
+for mtime, sid, cwd, summary in rows[:limit]:
+    print(f"{sid}|{cwd}|{int(mtime)}|{summary}")
+PY

@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+#
+# claude-resume <oturum-id> [cwd]
+#
+# Geçmiş bir Claude Code sohbetine, doğru proje dizininde ve kalıcı bir tmux
+# oturumunda devam eder. Aynı sohbete tekrar dokununca aynı tmux oturumuna bağlanır
+# (çift başlatmaz). caffeinate ile Mac uyumaz.
+#
+set -euo pipefail
+export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
+
+# Uzak (SSH) oturumlar Keychain'e erişemez; Claude girişini API anahtarıyla sağla.
+[ -f "$HOME/.config/claude-remote/env" ] && . "$HOME/.config/claude-remote/env"
+
+SID="${1:?kullanım: claude-resume <oturum-id> [cwd]}"
+CWD="${2:-$HOME}"
+[ -d "$CWD" ] || CWD="$HOME"
+
+# tmux oturum adı: sohbet id'sinin ilk 8 hanesi (stabil, çift açmayı önler).
+TNAME="chat-${SID:0:8}"
+
+# Komutu çift-tırnakla kur (eski bash'lerde olmayan ${..@Q} kullanma). CWD boşluk
+# içerebilir → "..." ile sarılı; SID bir UUID, güvenli.
+CMD="cd \"$CWD\" && caffeinate -dis claude --resume \"$SID\""
+exec tmux new-session -A -s "$TNAME" "$CMD"

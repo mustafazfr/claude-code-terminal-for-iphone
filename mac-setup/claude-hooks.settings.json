@@ -1,0 +1,25 @@
+{
+  "_comment": "Bu bir ÖRNEK parçadır — dosyayı olduğu gibi kopyalama. Aşağıdaki 'hooks' bloğunu mevcut ~/.claude/settings.json dosyana ELLE ekle/birleştir (mevcut hook'larını ezme!). Hook event adlarını doğrulamak için Claude Code içinde /hooks komutunu çalıştır.",
+  "hooks": {
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/bin/claude-notify \"Claude girdini bekliyor\" \"Claude Code\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/bin/claude-notify \"Claude işi bitirdi ✅\" \"Claude Code\""
+          }
+        ]
+      }
+    ]
+  }
+}

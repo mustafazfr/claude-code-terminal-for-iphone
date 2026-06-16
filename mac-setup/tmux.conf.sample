@@ -1,0 +1,13 @@
+# Önerilen ~/.tmux.conf — telefondan kullanım için küçük iyileştirmeler.
+# Kurmak için:  cp mac-setup/tmux.conf.sample ~/.tmux.conf  (mevcut dosyan varsa birleştir)
+
+set -g history-limit 50000      # uzun scrollback (uzaktan geri kaydırmak için)
+set -g mouse on                 # mobil istemcilerde dokunma/kaydırma
+set -g status-interval 5
+setw -g aggressive-resize on    # farklı ekran boyutlarına hızlı uyum (telefon/iPad)
+set -sg escape-time 10          # mobil klavyede Esc gecikmesini azalt
+set -g default-terminal "tmux-256color"
+
+# Oturum/pencere isimleri telefonda listelenecek; okunaklı tut.
+set -g status-left-length 30
+set -g status-right "#H  %H:%M"
