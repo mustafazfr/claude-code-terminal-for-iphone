@@ -1,0 +1,53 @@
+name: ClaudeRemote
+options:
+  bundleIdPrefix: com.mustafa
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"          # 6.2 derleyici, Swift 5 dil modu (bağımlılık uyumu için)
+    CODE_SIGN_STYLE: Automatic
+    # Cihaza kurarken kendi Apple takımını yaz (Xcode → Signing & Capabilities → Team),
+    # ya da install-device.sh otomatik algılar. Boş bırakıldı (herkesin kendi takımı).
+    DEVELOPMENT_TEAM: ""
+    # "Explicitly Built Modules" bu ortamda C modülü .pcm'lerini bulamayıp derlemeyi
+    # bozuyor; klasik (implicit) modüllere dönüyoruz. (CLI'dan da geçilmeli — bkz README.)
+    SWIFT_ENABLE_EXPLICIT_MODULES: "NO"
+    CLANG_ENABLE_EXPLICIT_MODULES: "NO"
+
+packages:
+  # Tüm SSH/terminal bağımlılıkları yerel SSHKit paketinde toplanır (bkz SSHKit/Package.swift).
+  SSHKit:
+    path: SSHKit
+
+targets:
+  ClaudeRemote:
+    type: application
+    platform: iOS
+    sources:
+      - path: ClaudeRemote
+    dependencies:
+      - package: SSHKit
+    info:
+      path: ClaudeRemote/Info.plist
+      properties:
+        CFBundleDisplayName: ClaudeRemote
+        UILaunchScreen: {}
+        ITSAppUsesNonExemptEncryption: false
+        NSFaceIDUsageDescription: "SSH özel anahtarını korumak için. Mac'ine bağlanırken kimliğini Face ID ile doğrularız; anahtar telefondan asla çıkmaz."
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mustafa.clauderemote
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        TARGETED_DEVICE_FAMILY: "1,2"
+
+schemes:
+  ClaudeRemote:
+    build:
+      targets:
+        ClaudeRemote: all
+    run:
+      config: Debug
