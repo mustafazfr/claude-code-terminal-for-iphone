@@ -18,6 +18,10 @@ struct TerminalSurface: UIViewRepresentable {
         terminal.backgroundColor = .black
         terminal.nativeForegroundColor = .white
         terminal.nativeBackgroundColor = .black
+        // Parmakla kaydırma terminale "fare" olarak gitmesin; bunun yerine SwiftTerm'in
+        // kendi kaydırma/gezinme davranışını (scrollback + ok tuşu) tetiklesin. Mobilde
+        // kaydırma, fare bildiriminden çok daha önemli.
+        terminal.allowMouseReporting = false
         context.coordinator.terminal = terminal
 
         // Host -> terminal (onData ana iş parçacığında çağrılır, feed güvenli).
