@@ -52,16 +52,13 @@ struct ConversationsView: View {
             TerminalScreen(
                 host: host, password: password,
                 title: target.chat.projectName,
-                initialCommand: "claude-resume \(target.chat.sessionId) \(shellQuote(target.chat.cwd))"
+                initialCommand: "claude-resume \(Shell.quote(target.chat.sessionId)) \(Shell.quote(target.chat.cwd))"
             )
         }
         .task { await controller.load(host: host, password: password) }
         .refreshable { await controller.load(host: host, password: password) }
     }
 
-    private func shellQuote(_ s: String) -> String {
-        "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
-    }
 }
 
 struct ResumeTarget: Identifiable, Hashable {

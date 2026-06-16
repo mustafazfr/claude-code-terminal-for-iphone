@@ -14,7 +14,8 @@ struct TerminalScreen: View {
     @StateObject private var ssh = SSHTerminalSession()
 
     private var startupCommand: String {
-        initialCommand ?? "claude-tmux \(title)"
+        // session adı tmux ls'ten gelebilir; enjeksiyona karşı tırnakla.
+        initialCommand ?? "claude-tmux \(Shell.quote(title))"
     }
 
     var body: some View {
