@@ -17,11 +17,17 @@ import os, sys, json, glob
 
 proj, limit = sys.argv[1], int(sys.argv[2])
 
-# Gerçek kullanıcı sohbeti olmayan iç sistem oturumlarını ele.
+# Gerçek kullanıcı sohbeti olmayan iç/otomatik araç oturumlarını ele
+# (security-review, commit özetleme, hafıza sıkıştırma, kod analizi vb.).
 INTERNAL_PREFIXES = (
     "Apply maximum non-destructive compression",
     "You are summarizing a Claude Code session",
     "Analyze this codebase and create",
+    "Review this change for security vulnerabilities",
+    "You previously flagged these candidate vulnerabilities",
+    "You are an expert", "You are a ", "You are summarizing",
+    "Summarize this Claude Code session",
+    "<command-name>", "<local-command",
 )
 import re
 def clean_summary(s):
