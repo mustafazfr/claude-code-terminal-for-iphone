@@ -1,36 +1,44 @@
 import Foundation
 import SSHKit   // Citadel + NIOCore + NIOSSH yeniden dışa verilmiş
 
-/// Mac'e SSH ile bağlanıp interaktif bir PTY (sözde-terminal) açar.
-/// Host'tan gelen baytları `onData` ile dışarı verir; kullanıcı girişini `send` ile yollar.
-///
-/// Citadel'in `withPTY` kapanışı, kanal açık kaldığı sürece çalışır. Kapanış içinde
-/// gelen akışı dinleriz; `outbound` writer'ı dışarı saklayıp UI'dan yazma yaparız.
+/// NIO event-loop thread'inden gelen baytları kilitle koruyup biriktirir.
+/// MainActor'a her chunk için zıplamak yerine, ~60fps'de topluca boşaltırız (coalescing) —
+/// yoğun çıktıda (Claude'un TUI'si) takılma ve giriş gecikmesini önler.
+private final class OutputBuffer: @unchecked Sendable {
+    private let lock = NSLock()
+    private var bytes: [UInt8] = []
+    func append(_ b: [UInt8]) { lock.lock(); bytes.append(contentsOf: b); lock.unlock() }
+    func drain() -> [UInt8] {
+        lock.lock(); defer { lock.unlock() }
+        let out = bytes; bytes.removeAll(keepingCapacity: true); return out
+    }
+}
+
+/// Mac'e SSH ile bağlanıp interaktif bir PTY açar. Host çıktısını `onData` ile (MainActor'da,
+/// tamponlanmış) verir; kullanıcı girişini `send` ile yollar.
 @MainActor
 final class SSHTerminalSession: ObservableObject {
     enum Status: Equatable {
-        case idle
-        case connecting
-        case connected
-        case closed
+        case idle, connecting, connected, closed
         case failed(String)
     }
 
     @Published private(set) var status: Status = .idle
 
-    /// Host'tan gelen baytlar (TerminalSurface bunu terminale besler). Ana iş parçacığında çağrılır.
+    /// Host'tan gelen baytlar (TerminalSurface terminale besler). MainActor'da, ~16ms'de bir, toplu.
     var onData: (([UInt8]) -> Void)?
 
     private var client: SSHClient?
     private var writer: TTYStdinWriter?
     private var runTask: Task<Void, Never>?
+    private var flushTask: Task<Void, Never>?
+    private nonisolated let outBuf = OutputBuffer()
 
-    /// - initialCommand: bağlanınca shell'e otomatik yazılacak komut (örn. "claude-tmux main").
-    /// - password: yalnızca host.auth == .password ise kullanılır.
     func connect(host: Host, password: String,
                  cols: Int, rows: Int, initialCommand: String? = nil) {
         guard case .idle = status else { return }
         status = .connecting
+        startFlushLoop()
 
         runTask = Task { [weak self] in
             guard let self else { return }
@@ -58,17 +66,17 @@ final class SSHTerminalSession: ObservableObject {
 
                 try await client.withPTY(pty) { inbound, outbound in
                     await MainActor.run { self.writer = outbound }
-                    // Shell açılır açılmaz istenen komutu çalıştır (örn. claude-tmux).
                     if let initialCommand {
                         var buf = ByteBufferAllocator().buffer(capacity: initialCommand.utf8.count + 1)
                         buf.writeString(initialCommand + "\n")
                         try await outbound.write(buf)
                     }
+                    // Sıcak yol: MainActor'a zıplamadan tampona yaz (flush döngüsü boşaltır).
                     for try await chunk in inbound {
                         switch chunk {
                         case .stdout(let buffer), .stderr(let buffer):
                             if let bytes = buffer.getBytes(at: buffer.readerIndex, length: buffer.readableBytes) {
-                                await MainActor.run { self.onData?(bytes) }
+                                self.outBuf.append(bytes)
                             }
                         }
                     }
@@ -76,6 +84,19 @@ final class SSHTerminalSession: ObservableObject {
                 self.status = .closed
             } catch {
                 self.status = .failed(String(describing: error))
+            }
+        }
+    }
+
+    /// ~16ms'de bir tamponu boşaltıp terminale besler (60fps). Tek MainActor akışı.
+    private func startFlushLoop() {
+        flushTask?.cancel()
+        flushTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 16_000_000)
+                guard let self else { return }
+                let data = self.outBuf.drain()
+                if !data.isEmpty { self.onData?(data) }
             }
         }
     }
@@ -88,11 +109,8 @@ final class SSHTerminalSession: ObservableObject {
         Task { try? await writer.write(buffer) }
     }
 
-    func send(text: String) {
-        send(ArraySlice(Array(text.utf8)))
-    }
+    func send(text: String) { send(ArraySlice(Array(text.utf8))) }
 
-    /// Terminal boyutu değişince PTY'ye bildir (programlar doğru sarsın).
     func resize(cols: Int, rows: Int) {
         guard let writer else { return }
         Task { try? await writer.changeSize(cols: cols, rows: rows, pixelWidth: 0, pixelHeight: 0) }
@@ -100,6 +118,7 @@ final class SSHTerminalSession: ObservableObject {
 
     func disconnect() {
         runTask?.cancel()
+        flushTask?.cancel()
         let client = client
         self.client = nil
         self.writer = nil
