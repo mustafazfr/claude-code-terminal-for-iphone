@@ -1,30 +1,34 @@
 #!/usr/bin/env bash
 #
-# claude-tmux [session]
+# claude-tmux [session] [account]
 #
 # Adı verilen tmux oturumuna bağlanır, yoksa oluşturur. Claude'u OTOMATİK
-# BAŞLATMAZ — seni home dizininde normal bir kabuğa bırakır. Kontrol sende:
-# istediğinde `claude` yazıp başlatırsın.
+# BAŞLATMAZ — seni home dizininde normal bir kabuğa bırakır. Kontrol sende.
 #
-# Neden tmux?  SSH bağlantısı kopunca (telefon uykuya geçti, ağ değişti) çıplak
-#   bir kabuk SIGHUP alır ve içindekiler ölür. tmux server Mac'te ayrı çalıştığından
-#   bağlantı kopması yalnızca "izleyiciyi" ayırır; oturum (ve Claude) yaşamaya devam eder.
-# Neden caffeinate?  MacBook'u uyutmaz; oturum açık olduğu sürece iş devam eder.
+# account verilirse o Claude hesabının OAuth token'ı bu oturuma yüklenir
+# (çoklu hesap; bkz. claude-account). Verilmezse varsayılan env kullanılır.
 #
 set -euo pipefail
 
 SESSION="${1:-main}"
+ACCOUNT="${2:-}"
 
 # SSH (login olmayan) kabuklarda da tmux/claude/node PATH'te olsun:
 export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
 
-# Uzak (SSH) oturumlar Mac'in Keychain'ine erişemediği için Claude girişini bir
-# OAuth token'la sağlıyoruz (bkz. SETUP.md). Bu dosya varsa yüklenir.
-# (Mac'in kendi Terminal'ini etkilemez — sadece bu script'le açılan oturumlar.)
-[ -f "$HOME/.config/claude-remote/env" ] && . "$HOME/.config/claude-remote/env"
-# Token kopyalanırken araya kaçan boşluk/satırsonu 401'e yol açar → temizle.
-[ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && export CLAUDE_CODE_OAUTH_TOKEN="$(printf %s "$CLAUDE_CODE_OAUTH_TOKEN" | tr -d '[:space:]')"
+# Claude girişi (Keychain SSH'tan okunamaz → OAuth token). Önce seçilen hesap,
+# yoksa eski tek-hesap env dosyası. Token'ı oturumun kendi ortamına gömeriz.
+TOK=""
+if [ -n "$ACCOUNT" ] && command -v claude-account >/dev/null 2>&1; then
+  TOK="$(claude-account token "$ACCOUNT" 2>/dev/null || true)"
+fi
+if [ -z "$TOK" ] && [ -f "$HOME/.config/claude-remote/env" ]; then
+  . "$HOME/.config/claude-remote/env"
+  TOK="${CLAUDE_CODE_OAUTH_TOKEN:-}"
+fi
+TOK="$(printf %s "$TOK" | tr -d '[:space:]')"   # kopyalama boşluklarını temizle (401 önleme)
 
 # -A: oturum varsa ona bağlan, yoksa oluştur. caffeinate Mac'i uyutmaz.
-# Login shell → home dizininde, profilin yüklü, claude PATH'te. claude'u SEN başlatırsın.
-exec tmux new-session -A -s "$SESSION" "caffeinate -dis ${SHELL:-/bin/zsh} -l"
+# Token'ı tmux oturumunun ortamına koy (o oturumdaki tüm claude çağrıları kullanır).
+exec env CLAUDE_CODE_OAUTH_TOKEN="$TOK" \
+  tmux new-session -A -s "$SESSION" "caffeinate -dis ${SHELL:-/bin/zsh} -l"

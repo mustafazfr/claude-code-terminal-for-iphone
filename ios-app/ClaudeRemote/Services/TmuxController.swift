@@ -27,6 +27,16 @@ final class TmuxController: ObservableObject {
         }
     }
 
+    /// Mac'te kayıtlı Claude hesaplarını (claude-account list) döndürür.
+    func accounts(host: Host, password: String) async -> [String] {
+        let conn = ConnectionPool.connection(for: host, password: password)
+        let cmd = #"export PATH="$HOME/bin:/opt/homebrew/bin:$HOME/.local/bin:$PATH"; claude-account list 2>/dev/null; true"#
+        guard let out = try? await conn.run(cmd) else { return [] }
+        return out.split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && !$0.hasPrefix("(") }
+    }
+
     /// Bir tmux oturumunu sonlandırır, sonra listeyi yeniler.
     func kill(session name: String, host: Host, password: String) async {
         let conn = ConnectionPool.connection(for: host, password: password)

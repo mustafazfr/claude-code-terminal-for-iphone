@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+#
+# claude-account <komut> ...
+#   list                         — kayıtlı hesapları listele
+#   add    <isim>                — yeni hesap ekle (setup-token'ı sen yapıştırırsın)
+#   remove <isim>                — hesabı sil
+#   token  <isim>                — o hesabın token'ını yazdır (scriptler kullanır)
+#
+# Birden çok Claude hesabını destekler: her hesabın OAuth token'ı ayrı dosyada
+# (~/.config/claude-remote/accounts/<isim>.token, chmod 600). Uygulama hangi hesabı
+# seçerse claude-tmux/claude-resume o hesabın token'ını yükler.
+#
+set -euo pipefail
+DIR="$HOME/.config/claude-remote/accounts"
+mkdir -p "$DIR"; chmod 700 "$DIR"
+
+trim() { printf %s "$1" | tr -d '[:space:]'; }
+
+case "${1:-list}" in
+  list)
+    found=0
+    for f in "$DIR"/*.token; do
+      [ -e "$f" ] || continue
+      n=$(basename "$f" .token); echo "$n"; found=1
+    done
+    [ "$found" = 0 ] && echo "(hesap yok — 'claude-account add <isim>' ile ekle)" >&2
+    ;;
+  add)
+    name="${2:?kullanım: claude-account add <isim>}"
+    echo "1) Mac'te (GUI Terminal) ilgili hesaba giriş yap ve: claude setup-token"
+    echo "2) Çıkan token'ı (sk-ant-oat...) buraya yapıştır, Enter:"
+    read -r tok
+    tok=$(trim "$tok")
+    [ -z "$tok" ] && { echo "❌ boş token"; exit 1; }
+    printf '%s\n' "$tok" > "$DIR/$name.token"
+    chmod 600 "$DIR/$name.token"
+    echo "✅ '$name' eklendi."
+    ;;
+  remove)
+    name="${2:?kullanım: claude-account remove <isim>}"
+    rm -f "$DIR/$name.token" && echo "✅ '$name' silindi."
+    ;;
+  token)
+    name="${2:?}"
+    f="$DIR/$name.token"
+    [ -f "$f" ] || { echo "" ; exit 1; }
+    trim "$(cat "$f")"
+    ;;
+  *)
+    echo "Kullanım: claude-account {list|add <isim>|remove <isim>|token <isim>}" >&2; exit 1;;
+esac

@@ -8,14 +8,19 @@ struct TerminalScreen: View {
     let password: String
     /// Başlıkta görünecek ad.
     var title: String = "main"
-    /// Bağlanınca shell'e yazılacak komut. nil → varsayılan: `claude-tmux <title>`.
+    /// Bağlanınca shell'e yazılacak komut. nil → varsayılan: `claude-tmux <title> [account]`.
     var initialCommand: String?
+    /// Bu oturumda kullanılacak Claude hesabı (claude-account adı). Boş → varsayılan.
+    var account: String = ""
 
     @StateObject private var ssh = SSHTerminalSession()
 
     private var startupCommand: String {
-        // session adı tmux ls'ten gelebilir; enjeksiyona karşı tırnakla.
-        initialCommand ?? "claude-tmux \(Shell.quote(title))"
+        if let initialCommand { return initialCommand }
+        // session + hesap adı dışarıdan gelir; enjeksiyona karşı tırnakla.
+        var cmd = "claude-tmux \(Shell.quote(title))"
+        if !account.isEmpty { cmd += " \(Shell.quote(account))" }
+        return cmd
     }
 
     var body: some View {

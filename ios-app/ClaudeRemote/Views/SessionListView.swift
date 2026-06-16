@@ -10,6 +10,8 @@ struct SessionListView: View {
     @State private var terminal: TerminalTarget?
     @State private var showNewSheet = false
     @State private var newName = ""
+    @State private var accounts: [String] = []
+    @State private var selectedAccount: String = ""
 
     var body: some View {
         List {
@@ -50,6 +52,18 @@ struct SessionListView: View {
                 }
             }
 
+            if accounts.count > 1 {
+                Section {
+                    Picker("Claude hesabı", selection: $selectedAccount) {
+                        ForEach(accounts, id: \.self) { Text($0).tag($0) }
+                    }
+                } header: {
+                    Text("Hesap")
+                } footer: {
+                    Text("Yeni açılan terminaller bu Claude hesabıyla çalışır.")
+                }
+            }
+
             Section {
                 Button { newName = ""; showNewSheet = true } label: {
                     Label("Yeni terminal aç", systemImage: "plus.circle.fill")
@@ -74,7 +88,7 @@ struct SessionListView: View {
             }
         }
         .navigationDestination(item: $terminal) { target in
-            TerminalScreen(host: host, password: password, title: target.name)
+            TerminalScreen(host: host, password: password, title: target.name, account: selectedAccount)
         }
         .alert("Yeni terminal", isPresented: $showNewSheet) {
             TextField("Oturum adı (örn. proje1)", text: $newName)
@@ -88,7 +102,14 @@ struct SessionListView: View {
         } message: {
             Text("Bu adla bir oturum varsa ona bağlanır, yoksa yeni açar.")
         }
-        .task { await controller.load(host: host, password: password) }
+        .task {
+            await controller.load(host: host, password: password)
+            accounts = await controller.accounts(host: host, password: password)
+            // Varsayılan hesabı seç (host'taki ya da ilk hesap).
+            if selectedAccount.isEmpty {
+                selectedAccount = accounts.contains(host.account) ? host.account : (accounts.first ?? "")
+            }
+        }
         .refreshable { await controller.load(host: host, password: password) }
     }
 

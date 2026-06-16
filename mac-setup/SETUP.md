@@ -91,6 +91,20 @@ token — local Mac usage is unchanged. The file is git‑ignored. If the token 
 Anthropic Console. (Viewing **past chats** does not need this — those are plain files on disk; the token is
 only needed for Claude to actually talk to the model.)
 
+### Multiple Claude accounts (optional)
+
+If you use more than one Claude account, register each one and pick which to use from the app:
+
+```bash
+claude-account add work       # paste a setup-token for that account
+claude-account add personal
+claude-account list
+```
+
+Each account's token is stored separately (`~/.config/claude-remote/accounts/<name>.token`, `600`). In the
+app's session list, an **Account** picker appears when more than one account exists; new terminals use the
+selected account. Tokens are trimmed automatically (stray whitespace causes 401s).
+
 ## 6. Optional: push notifications
 
 Subscribe to a private topic in the [ntfy](https://ntfy.sh) app, then:
