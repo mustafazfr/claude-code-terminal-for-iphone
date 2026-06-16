@@ -71,6 +71,18 @@ struct HostEditView: View {
                         Label("Host adımı / kurulumu nasıl yaparım?", systemImage: "questionmark.circle")
                     }
                 }
+
+                if let existing, HostKeyStore.hasPinned(existing.id) {
+                    Section {
+                        Button(role: .destructive) {
+                            HostKeyStore.reset(for: existing.id)
+                        } label: {
+                            Label("Bu Mac'in güvenini sıfırla", systemImage: "exclamationmark.shield")
+                        }
+                    } footer: {
+                        Text("Yalnızca Mac'i bilerek yeniden kurduysan kullan. Bağlanırken 'kimlik değişti' uyarısı alıyorsan ve bunu sen yapmadıysan, SIFIRLAMA — saldırı olabilir.")
+                    }
+                }
             }
             .navigationTitle(existing == nil ? "Yeni Mac" : "Mac'i düzenle")
             .navigationBarTitleDisplayMode(.inline)

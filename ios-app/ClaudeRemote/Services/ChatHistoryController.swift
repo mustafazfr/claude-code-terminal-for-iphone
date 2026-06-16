@@ -19,7 +19,7 @@ final class ChatHistoryController: ObservableObject {
             let client = try await SSHClient.connect(
                 host: host.hostname, port: host.port,
                 authenticationMethod: auth,
-                hostKeyValidator: .acceptAnything(),
+                hostKeyValidator: HostKeyVerification.validator(for: host),
                 reconnect: .never
             )
             let cmd = #"export PATH="$HOME/bin:/opt/homebrew/bin:$HOME/.local/bin:$PATH"; claude-sessions 60 2>/dev/null; true"#

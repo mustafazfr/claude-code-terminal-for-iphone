@@ -24,6 +24,7 @@ final class HostStore: ObservableObject {
         hosts.removeAll { $0.id == host.id }
         persist()
         KeychainStore.deletePassword(for: host.id)
+        HostKeyStore.reset(for: host.id)   // sabitlenmiş host anahtarı güvenini de temizle
     }
 
     func password(for host: Host) -> String? {

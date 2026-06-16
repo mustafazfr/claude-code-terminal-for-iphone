@@ -20,7 +20,7 @@ final class TmuxController: ObservableObject {
             let client = try await SSHClient.connect(
                 host: host.hostname, port: host.port,
                 authenticationMethod: auth,
-                hostKeyValidator: .acceptAnything(),
+                hostKeyValidator: HostKeyVerification.validator(for: host),
                 reconnect: .never
             )
             // tmux yoksa/oturum yoksa stderr'i yut → boş liste. PATH'e Homebrew'i ekle.

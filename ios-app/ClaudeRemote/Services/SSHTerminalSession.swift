@@ -40,7 +40,7 @@ final class SSHTerminalSession: ObservableObject {
                     host: host.hostname,
                     port: host.port,
                     authenticationMethod: auth,
-                    hostKeyValidator: .acceptAnything(),
+                    hostKeyValidator: HostKeyVerification.validator(for: host),
                     reconnect: .never
                 )
                 self.client = client
