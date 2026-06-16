@@ -4,7 +4,9 @@ import SwiftUI
 struct ClaudeRemoteApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            AppLockGate {
+                ContentView()
+            }
         }
     }
 }

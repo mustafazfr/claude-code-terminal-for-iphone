@@ -6,6 +6,7 @@ struct ConnectView: View {
     @State private var opened: OpenedHost?
     @State private var editTarget: EditTarget?
     @State private var showHelp = false
+    @State private var showSettings = false
 
     var body: some View {
         NavigationStack {
@@ -42,6 +43,11 @@ struct ConnectView: View {
             }
             .navigationTitle("ClaudeRemote")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { showSettings = true } label: {
+                        Image(systemName: "gearshape")
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showHelp = true } label: {
                         Image(systemName: "questionmark.circle")
@@ -58,6 +64,7 @@ struct ConnectView: View {
                 }
             }
             .sheet(isPresented: $showHelp) { HelpView() }
+            .sheet(isPresented: $showSettings) { SettingsView() }
         }
     }
 
