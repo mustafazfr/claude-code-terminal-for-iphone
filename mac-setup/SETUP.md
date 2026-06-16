@@ -70,20 +70,26 @@ Pick based on your network (see *Connectivity* in the top‑level README):
 - **Carrier‑grade NAT:** run a reverse tunnel, e.g. `bore local 22 --to bore.pub`, and connect to the
   host/port it prints.
 
-## 5. Authentication note (macOS Keychain)
+## 5. Remote login (macOS Keychain limitation)
 
-Claude Code stores its login token in the macOS **Keychain**, which a non‑GUI SSH session cannot read
-(you'll see *"Not logged in"* over SSH even though the Mac GUI is signed in). For remote use, provide an
-API key so SSH sessions authenticate without the Keychain:
+Claude Code stores its login in the macOS **Keychain**, which a non‑GUI SSH session cannot read — over
+SSH you'll see *"Not logged in"* even though the Mac's GUI is signed in. The fix is a **long‑lived OAuth
+token**, which works with your existing **Claude subscription at no extra cost** (this is *not* an API key
+— API keys bill per token):
 
 ```bash
+# On the Mac GUI (Terminal), once:
+claude setup-token            # sign in; prints a long-lived token (starts with sk-ant-oat...)
+
 mkdir -p ~/.config/claude-remote
-printf 'export ANTHROPIC_API_KEY="%s"\n' "YOUR_API_KEY" > ~/.config/claude-remote/env
+printf 'export CLAUDE_CODE_OAUTH_TOKEN="%s"\n' "PASTE_TOKEN_HERE" > ~/.config/claude-remote/env
 chmod 600 ~/.config/claude-remote/env
 ```
 
-`claude-tmux` and `claude-resume` source this file automatically, so only your remote sessions use the
-key — your local Mac usage is unchanged. (Get a key from the Anthropic Console. This file is git‑ignored.)
+`claude-tmux` and `claude-resume` source this file automatically, so **only your remote sessions** use the
+token — local Mac usage is unchanged. The file is git‑ignored. If the token ever leaks, revoke it from the
+Anthropic Console. (Viewing **past chats** does not need this — those are plain files on disk; the token is
+only needed for Claude to actually talk to the model.)
 
 ## 6. Optional: push notifications
 
