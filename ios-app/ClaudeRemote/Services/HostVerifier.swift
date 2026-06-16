@@ -9,19 +9,23 @@ final class HostVerifier: ObservableObject {
     enum State: Equatable {
         case idle
         case probing
-        case needsApproval(fingerprint: String)
-        case verified          // zaten sabitli veya onaylandı
+        case needsApproval(fingerprint: String)   // ilk kez: onayla ve sabitle
+        case mismatch(pinned: String, got: String) // pinli ≠ gelen: MITM ya da Mac yeniden kuruldu
+        case verified          // sabitli ve eşleşiyor / onaylandı
         case failed(String)
     }
     @Published private(set) var state: State = .idle
 
-    /// Sabitliyse doğrudan verified; değilse parmak izini yoklayıp onaya sunar.
+    /// Her zaman canlı anahtarı yoklar; pinliyse karşılaştırır (yanlış pin'i de yakalar).
     func start(host: Host, password: String) async {
-        if HostKeyStore.hasPinned(host.id) { state = .verified; return }
         state = .probing
         do {
             let fp = try await probeFingerprint(host: host, password: password)
-            state = .needsApproval(fingerprint: fp)
+            if let pinned = HostKeyStore.fingerprint(for: host.id) {
+                state = (pinned == fp) ? .verified : .mismatch(pinned: pinned, got: fp)
+            } else {
+                state = .needsApproval(fingerprint: fp)
+            }
         } catch {
             state = .failed(String(describing: error))
         }
@@ -31,6 +35,14 @@ final class HostVerifier: ObservableObject {
     func approve(host: Host) {
         if case .needsApproval(let fp) = state {
             HostKeyStore.store(fp, for: host.id)
+            state = .verified
+        }
+    }
+
+    /// Mac'i bilerek yeniden kurmuş; eski pin'i at, yeni anahtarı sabitle.
+    func resetAndTrust(host: Host) {
+        if case .mismatch(_, let got) = state {
+            HostKeyStore.store(got, for: host.id)
             state = .verified
         }
     }
