@@ -11,6 +11,26 @@ struct HostGateView: View {
 
     var body: some View {
         Group {
+            // HIZ: Mac daha önce doğrulanmışsa (pin var) ekstra "yoklama" bağlantısı açmadan
+            // doğrudan geç. Anahtar yine de her gerçek bağlantıda kontrol edilir (TOFU validator),
+            // yani güvenlik düşmez — sadece gereksiz ~1sn'lik probe gitmez.
+            if HostKeyStore.hasPinned(host.id) {
+                SessionListView(host: host, password: password)
+            } else {
+                gateContent
+            }
+        }
+        .navigationTitle(host.name)
+        .navigationBarTitleDisplayMode(.inline)
+        .task {
+            if !HostKeyStore.hasPinned(host.id) {
+                await verifier.start(host: host, password: password)
+            }
+        }
+    }
+
+    @ViewBuilder private var gateContent: some View {
+        Group {
             switch verifier.state {
             case .verified:
                 SessionListView(host: host, password: password)
@@ -38,9 +58,6 @@ struct HostGateView: View {
                 }
             }
         }
-        .navigationTitle(host.name)
-        .navigationBarTitleDisplayMode(.inline)
-        .task { await verifier.start(host: host, password: password) }
     }
 
     private func mismatch(pinned: String, got: String) -> some View {

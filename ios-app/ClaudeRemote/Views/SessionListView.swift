@@ -24,7 +24,20 @@ struct SessionListView: View {
                     Label("Bağlanılamadı", systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.red)
                     Text(message).font(.caption).foregroundStyle(.secondary)
-                    Button("Tekrar dene") { Task { await controller.load(host: host, password: password) } }
+                    if message.contains("HostKeyMismatch") || message.lowercased().contains("değişti") {
+                        Text("Mac'in kimlik anahtarı kayıtlıdan farklı. Mac'i yeniden kurduysan güveni sıfırla; sen yapmadıysan bağlanma.")
+                            .font(.caption).foregroundStyle(.red)
+                        Button(role: .destructive) {
+                            HostKeyStore.reset(for: host.id)
+                            ConnectionPool.drop(host.id)
+                            Task { await controller.load(host: host, password: password) }
+                        } label: { Label("Güveni sıfırla ve yeniden dene", systemImage: "arrow.triangle.2.circlepath") }
+                    } else {
+                        Button("Tekrar dene") {
+                            ConnectionPool.drop(host.id)
+                            Task { await controller.load(host: host, password: password) }
+                        }
+                    }
                 }
 
             case .loaded(let sessions):

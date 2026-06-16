@@ -27,11 +27,25 @@ case "${1:-list}" in
     ;;
   add)
     name="${2:?kullanım: claude-account add <isim>}"
-    echo "1) Mac'te (GUI Terminal) ilgili hesaba giriş yap ve: claude setup-token"
-    echo "2) Çıkan token'ı (sk-ant-oat...) buraya yapıştır, Enter:"
-    read -r tok
+    export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
+    tok=""
+    # Kolay yol: setup-token'ı biz çalıştıralım (tarayıcı açılır, sen login olursun),
+    # çıkan sk-ant-oat... token'ını otomatik yakalayalım. Elle kopyalamaya gerek yok.
+    if command -v claude >/dev/null 2>&1; then
+      echo "→ Tarayıcı açılacak; eklemek istediğin hesapla giriş yap…"
+      out="$(claude setup-token 2>&1 || true)"
+      tok="$(printf '%s\n' "$out" | grep -oE 'sk-ant-oat[A-Za-z0-9_-]+' | head -1)"
+    fi
+    # Yakalayamadıysak (ör. farklı sürüm) elle yapıştırmaya düş.
+    if [ -z "$tok" ]; then
+      echo "Token otomatik alınamadı. Açılan/çıkan token'ı (sk-ant-oat...) yapıştır, Enter:"
+      read -r tok
+    fi
     tok=$(trim "$tok")
-    [ -z "$tok" ] && { echo "❌ boş token"; exit 1; }
+    case "$tok" in
+      sk-ant-oat*) ;;
+      *) echo "❌ Geçersiz/boş token (sk-ant-oat... olmalı)"; exit 1;;
+    esac
     printf '%s\n' "$tok" > "$DIR/$name.token"
     chmod 600 "$DIR/$name.token"
     echo "✅ '$name' eklendi."
