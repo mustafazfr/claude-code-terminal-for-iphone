@@ -61,9 +61,12 @@ struct TerminalSurface: UIViewRepresentable {
         func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {}
         func scrolled(source: TerminalView, position: Double) {}
         // Terminaldeki bir bağlantıya dokununca TELEFONUN tarayıcısında aç
-        // (Claude Code login linki gibi). Mac'te değil, telefonda açılır.
+        // (Claude Code login linki gibi). GÜVENLİK: yalnızca http/https — kötü niyetli
+        // sunucunun garip şema (file:, javascript: vb.) URL'leri tetiklemesini engelle.
         func requestOpenLink(source: TerminalView, link: String, params: [String: String]) {
-            guard let url = URL(string: link.trimmingCharacters(in: .whitespacesAndNewlines)) else { return }
+            guard let url = URL(string: link.trimmingCharacters(in: .whitespacesAndNewlines)),
+                  let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https"
+            else { return }
             MainActor.assumeIsolated { UIApplication.shared.open(url) }
         }
         func bell(source: TerminalView) {}
