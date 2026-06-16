@@ -36,12 +36,17 @@ struct SessionListView: View {
                                 SessionRow(session: s)
                             }
                             .buttonStyle(.plain)
+                            .swipeActions(edge: .trailing) {
+                                Button(role: .destructive) {
+                                    Task { await controller.kill(session: s.name, host: host, password: password) }
+                                } label: { Label("Kapat", systemImage: "trash") }
+                            }
                         }
                     }
                 } header: {
                     Text("Açık terminaller (tmux)")
                 } footer: {
-                    Text("Bir oturuma dokun → kaldığın yerden devam et. Oturumlar Mac'te yaşar; bağlantı kopsa bile kapanmaz.")
+                    Text("Bir oturuma dokun → kaldığın yerden devam et. Oturumlar Mac'te yaşar; bağlantı kopsa bile kapanmaz. Sola kaydır → kapat.")
                 }
             }
 

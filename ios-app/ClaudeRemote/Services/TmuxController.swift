@@ -37,6 +37,24 @@ final class TmuxController: ObservableObject {
         }
     }
 
+    /// Bir tmux oturumunu sonlandırır (içindeki işler kapanır). Sonra listeyi yeniler.
+    func kill(session name: String, host: Host, password: String) async {
+        do {
+            let auth = try SSHAuth.method(for: host, password: password)
+            let client = try await SSHClient.connect(
+                host: host.hostname, port: host.port,
+                authenticationMethod: auth,
+                hostKeyValidator: HostKeyVerification.validator(for: host),
+                reconnect: .never
+            )
+            let cmd = #"export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"; "#
+                + "tmux kill-session -t \(Shell.quote("=\(name)")) 2>/dev/null; true"
+            _ = try? await client.executeCommand(cmd)
+            try? await client.close()
+        } catch { /* yine de listeyi tazeleyelim */ }
+        await load(host: host, password: password)
+    }
+
     /// `tmux list-sessions -F '#{session_name}|#{session_windows}|#{session_attached}'`
     /// çıktısını parse eder. Her satır: ad | pencere_sayısı | (1=bağlı / 0=ayrık)
     /// AYRAÇ komuttaki (satır ~29) ile AYNI olmalı: '|'.
