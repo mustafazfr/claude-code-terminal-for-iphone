@@ -40,14 +40,39 @@ if ! grep -qE '^\s*Include\s+/etc/ssh/sshd_config\.d/' /etc/ssh/sshd_config; the
 fi
 mkdir -p /etc/ssh/sshd_config.d
 
-cat > "$DROPIN" <<'EOF'
-# ClaudeRemote güvenlik sertleştirmesi
+cat > "$DROPIN" <<EOF
+# ClaudeRemote güvenlik sertleştirmesi (internete açık SSH için maksimum koruma)
+
+# --- Yalnızca açık anahtar; parola/etkileşimli giriş tamamen kapalı ---
 PubkeyAuthentication yes
 PasswordAuthentication no
 KbdInteractiveAuthentication no
 ChallengeResponseAuthentication no
-PermitRootLogin no
+PermitEmptyPasswords no
+AuthenticationMethods publickey
 UsePAM no
+
+# --- Yalnızca bu kullanıcı; root yasak ---
+PermitRootLogin no
+AllowUsers ${REAL_USER}
+
+# --- Kaba-kuvvet yüzeyini daralt ---
+MaxAuthTries 3
+LoginGraceTime 20
+MaxStartups 3:50:10
+MaxSessions 4
+
+# --- Ölü bağlantıları düşür ---
+ClientAliveInterval 300
+ClientAliveCountMax 2
+
+# --- Mac'i bir sıçrama (pivot) noktası olarak kullanmayı engelle ---
+AllowTcpForwarding no
+AllowAgentForwarding no
+AllowStreamLocalForwarding no
+GatewayPorts no
+PermitTunnel no
+X11Forwarding no
 EOF
 
 echo "==> Ayar sözdizimi doğrulanıyor (sshd -t)…"
