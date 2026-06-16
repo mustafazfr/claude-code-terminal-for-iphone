@@ -25,6 +25,7 @@ final class HostStore: ObservableObject {
         persist()
         KeychainStore.deletePassword(for: host.id)
         HostKeyStore.reset(for: host.id)   // sabitlenmiş host anahtarı güvenini de temizle
+        ConnectionPool.drop(host.id)       // paylaşılan SSH bağlantısını kapat
     }
 
     func password(for host: Host) -> String? {

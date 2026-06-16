@@ -1,8 +1,8 @@
 import Foundation
 import SSHKit
 
-/// Mac'teki tmux oturumlarını listeler. Kısa ömürlü bir SSH bağlantısı açıp
-/// `tmux list-sessions` çalıştırır, parse eder, kapatır (terminal PTY'sinden bağımsız).
+/// Mac'teki tmux oturumlarını listeler. Paylaşılan kalıcı SSH bağlantısını (ConnectionPool)
+/// kullanır → her yenilemede yeni bağlantı açmaz (yavaş relay'de büyük fark).
 @MainActor
 final class TmuxController: ObservableObject {
     enum State: Equatable {
@@ -16,48 +16,27 @@ final class TmuxController: ObservableObject {
     func load(host: Host, password: String) async {
         state = .loading
         do {
-            let auth = try SSHAuth.method(for: host, password: password)
-            let client = try await SSHClient.connect(
-                host: host.hostname, port: host.port,
-                authenticationMethod: auth,
-                hostKeyValidator: HostKeyVerification.validator(for: host),
-                reconnect: .never
-            )
-            // tmux yoksa/oturum yoksa stderr'i yut → boş liste. PATH'e Homebrew'i ekle.
-            // Ayraç olarak '|' kullanıyoruz (TAB raw-string'de düz metin '\t' olarak gidip bozuluyordu).
+            let conn = ConnectionPool.connection(for: host, password: password)
+            // Ayraç '|' (TAB raw-string'de bozuluyordu). PATH'e Homebrew'i ekle, hata yut.
             let cmd = #"export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"; "#
                 + "tmux list-sessions -F '#{session_name}|#{session_windows}|#{session_attached}' 2>/dev/null; true"
-            let buffer = try await client.executeCommand(cmd, mergeStreams: false)
-            try? await client.close()
-
-            let output = String(buffer: buffer)
+            let output = try await conn.run(cmd)
             state = .loaded(Self.parse(output))
         } catch {
             state = .failed(String(describing: error))
         }
     }
 
-    /// Bir tmux oturumunu sonlandırır (içindeki işler kapanır). Sonra listeyi yeniler.
+    /// Bir tmux oturumunu sonlandırır, sonra listeyi yeniler.
     func kill(session name: String, host: Host, password: String) async {
-        do {
-            let auth = try SSHAuth.method(for: host, password: password)
-            let client = try await SSHClient.connect(
-                host: host.hostname, port: host.port,
-                authenticationMethod: auth,
-                hostKeyValidator: HostKeyVerification.validator(for: host),
-                reconnect: .never
-            )
-            let cmd = #"export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"; "#
-                + "tmux kill-session -t \(Shell.quote("=\(name)")) 2>/dev/null; true"
-            _ = try? await client.executeCommand(cmd)
-            try? await client.close()
-        } catch { /* yine de listeyi tazeleyelim */ }
+        let conn = ConnectionPool.connection(for: host, password: password)
+        let cmd = #"export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"; "#
+            + "tmux kill-session -t \(Shell.quote("=\(name)")) 2>/dev/null; true"
+        _ = try? await conn.run(cmd)
         await load(host: host, password: password)
     }
 
-    /// `tmux list-sessions -F '#{session_name}|#{session_windows}|#{session_attached}'`
-    /// çıktısını parse eder. Her satır: ad | pencere_sayısı | (1=bağlı / 0=ayrık)
-    /// AYRAÇ komuttaki (satır ~29) ile AYNI olmalı: '|'.
+    /// `#{session_name}|#{session_windows}|#{session_attached}` satırlarını parse eder.
     static func parse(_ output: String) -> [TmuxSession] {
         output.split(whereSeparator: \.isNewline).compactMap { line in
             let parts = line.components(separatedBy: "|")

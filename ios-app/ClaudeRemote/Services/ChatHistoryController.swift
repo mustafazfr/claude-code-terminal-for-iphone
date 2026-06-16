@@ -1,5 +1,4 @@
 import Foundation
-import SSHKit
 
 /// Mac'teki Claude Code sohbet geçmişini getirir (`claude-sessions` script'i).
 @MainActor
@@ -15,17 +14,10 @@ final class ChatHistoryController: ObservableObject {
     func load(host: Host, password: String) async {
         state = .loading
         do {
-            let auth = try SSHAuth.method(for: host, password: password)
-            let client = try await SSHClient.connect(
-                host: host.hostname, port: host.port,
-                authenticationMethod: auth,
-                hostKeyValidator: HostKeyVerification.validator(for: host),
-                reconnect: .never
-            )
+            let conn = ConnectionPool.connection(for: host, password: password)
             let cmd = #"export PATH="$HOME/bin:/opt/homebrew/bin:$HOME/.local/bin:$PATH"; claude-sessions 60 2>/dev/null; true"#
-            let buffer = try await client.executeCommand(cmd, mergeStreams: false)
-            try? await client.close()
-            state = .loaded(Self.parse(String(buffer: buffer)))
+            let output = try await conn.run(cmd)
+            state = .loaded(Self.parse(output))
         } catch {
             state = .failed(String(describing: error))
         }
