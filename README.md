@@ -27,10 +27,17 @@ Two hard problems and how they're solved:
 
 ## Security
 
-SSH is exposed only with **public‑key authentication** (passwords disabled), so brute‑force is
-impossible. The private key is generated on the phone, stored in the iOS Keychain behind
-**Face ID / Touch ID**, and never leaves the device. Only the public key is added to the Mac.
-A hardening script disables password login and root login on the Mac.
+This exposes your Mac to the network, so security is treated as first‑class. See **[`SECURITY.md`](SECURITY.md)**
+for the full threat model. In short:
+
+- **Key‑only auth** (passwords disabled) → brute‑force is impossible.
+- **Private key on the phone, behind Face ID**, never leaves the device; only the public key is on the Mac.
+- **Trust‑on‑first‑use host‑key pinning** → a man‑in‑the‑middle / malicious relay can't impersonate your Mac.
+- **App lock** (Face ID on launch & resume), **sshd hardening** (no root, single user, attempt limits, no
+  forwarding/pivoting), and **shell‑quoted** remote commands.
+- Run **`mac-setup/bin/claude-doctor`** to audit your Mac's posture before exposing it.
+
+> Independent software, **not affiliated with Anthropic**.
 
 ## Requirements
 

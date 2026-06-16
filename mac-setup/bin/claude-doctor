@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+#
+# claude-doctor — Mac'in uzaktan-erişim güvenlik duruşunu denetler ve raporlar.
+# İnternete açmadan önce ve sonra çalıştır. Salt-okunur; hiçbir şeyi değiştirmez.
+#
+export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
+pass=0; warn=0; fail=0
+ok()   { printf "  \033[32m✓\033[0m %s\n" "$1"; pass=$((pass+1)); }
+wn()   { printf "  \033[33m!\033[0m %s\n" "$1"; warn=$((warn+1)); }
+bad()  { printf "  \033[31m✗\033[0m %s\n" "$1"; fail=$((fail+1)); }
+
+echo "ClaudeRemote güvenlik denetimi"
+echo "─────────────────────────────"
+
+# 1) Remote Login açık mı? (macOS'ta sshd launchd ile talep üzerine başlar; port testi en güveniliri)
+if (exec 3<>/dev/tcp/127.0.0.1/22) 2>/dev/null; then
+  ok "SSH (Remote Login) açık"; exec 3>&- 2>/dev/null
+elif command -v nc >/dev/null 2>&1 && nc -z -G2 127.0.0.1 22 2>/dev/null; then
+  ok "SSH (Remote Login) açık"
+else
+  bad "SSH kapalı — System Settings → Sharing → Remote Login'i aç"
+fi
+
+# 2) Sertleştirme drop-in var mı?
+DROPIN=/etc/ssh/sshd_config.d/100-clauderemote.conf
+if [ -f "$DROPIN" ]; then
+  ok "sshd sertleştirme uygulanmış"
+  grep -q "PasswordAuthentication no"   "$DROPIN" && ok "Parola girişi kapalı (yalnız anahtar)" || bad "Parola girişi açık olabilir — harden-ssh.sh çalıştır"
+  grep -q "PermitRootLogin no"          "$DROPIN" && ok "Root girişi kapalı" || wn "PermitRootLogin no değil"
+  grep -q "^AllowUsers "                "$DROPIN" && ok "Giriş tek kullanıcıyla sınırlı" || wn "AllowUsers ayarlı değil"
+  grep -q "MaxAuthTries 3"              "$DROPIN" && ok "Deneme limiti sıkı (MaxAuthTries)" || wn "MaxAuthTries ayarlı değil"
+  grep -q "AllowTcpForwarding no"       "$DROPIN" && ok "Port yönlendirme kapalı (pivot engeli)" || wn "AllowTcpForwarding kısıtlı değil"
+else
+  bad "Sertleştirme YOK — sudo bash mac-setup/bin/harden-ssh.sh çalıştır"
+fi
+
+# 3) authorized_keys var mı, izinleri doğru mu?
+AK="$HOME/.ssh/authorized_keys"
+if [ -s "$AK" ]; then
+  n=$(grep -c . "$AK")
+  ok "authorized_keys var ($n anahtar)"
+  perm=$(stat -f "%Lp" "$AK" 2>/dev/null)
+  [ "$perm" = "600" ] && ok "authorized_keys izinleri 600" || wn "authorized_keys izni $perm (600 olmalı: chmod 600)"
+  sshperm=$(stat -f "%Lp" "$HOME/.ssh" 2>/dev/null)
+  [ "$sshperm" = "700" ] && ok "~/.ssh izinleri 700" || wn "~/.ssh izni $sshperm (700 olmalı)"
+else
+  bad "authorized_keys yok/boş — telefondaki genel anahtarı ekle"
+fi
+
+# 4) tmux + caffeinate
+command -v tmux >/dev/null 2>&1 && ok "tmux kurulu" || bad "tmux yok — brew install tmux"
+command -v caffeinate >/dev/null 2>&1 && ok "caffeinate var" || wn "caffeinate bulunamadı"
+
+# 5) Uzak Claude girişi (Keychain SSH'tan okunamaz; token/key gerekir)
+if [ -f "$HOME/.config/claude-remote/env" ]; then
+  ok "Uzak Claude girişi yapılandırılmış (claude-remote/env)"
+else
+  wn "Uzak Claude girişi yok — SSH'ta 'Not logged in' alabilirsin (bkz. SETUP.md adım 5)"
+fi
+
+echo "─────────────────────────────"
+printf "Sonuç: \033[32m%d geçti\033[0m, \033[33m%d uyarı\033[0m, \033[31m%d başarısız\033[0m\n" "$pass" "$warn" "$fail"
+[ "$fail" -eq 0 ] && echo "✅ Güvenlik temeli sağlam." || echo "⚠️ Yukarıdaki ✗ maddeleri internete açmadan ÖNCE düzelt."
