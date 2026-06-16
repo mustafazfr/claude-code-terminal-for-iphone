@@ -1,0 +1,24 @@
+# ── Xcode / SwiftPM derleme çıktıları (XcodeGen üretir; project.yml kaynaktır) ──
+ios-app/ClaudeRemote.xcodeproj/
+ios-app/SharedBuild/
+ios-app/build/
+ios-app/DerivedData/
+ios-app/DerivedDataDevice/
+**/.build/
+**/build/
+**/.swiftpm/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# ── Oturum/araç notları (kişisel; asla yayınlama) ──
+.remember/
+**/.remember/
+
+# ── Çalışma zamanı gizli yapılandırma (ASLA commit etme) ──
+**/ntfy.conf
+**/claude-remote/env
+*.log
+
+# ── macOS ──
+.DS_Store
