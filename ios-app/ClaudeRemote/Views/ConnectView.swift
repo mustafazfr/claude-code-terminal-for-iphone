@@ -55,7 +55,7 @@ struct ConnectView: View {
                 }
             }
             .navigationDestination(item: $opened) { route in
-                SessionListView(host: route.host, password: route.password)
+                HostGateView(host: route.host, password: route.password)
             }
             .sheet(item: $editTarget) { target in
                 HostEditView(store: store, existing: target.host) { host, password in

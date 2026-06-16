@@ -4,6 +4,26 @@
 # İnternete açmadan önce ve sonra çalıştır. Salt-okunur; hiçbir şeyi değiştirmez.
 #
 export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
+
+# --fingerprint: Mac'in SSH host anahtarı parmak izini, uygulamayla AYNI biçimde yazdır
+# (SHA256:base64). İlk bağlantıda uygulamadaki değerle gözle karşılaştır.
+if [ "${1:-}" = "--fingerprint" ]; then
+  echo "Bu Mac'in SSH host anahtarı parmak izi (uygulamadakiyle karşılaştır):"
+  shown=0
+  for k in /etc/ssh/ssh_host_ed25519_key.pub /etc/ssh/ssh_host_rsa_key.pub /etc/ssh/ssh_host_ecdsa_key.pub; do
+    [ -f "$k" ] || continue
+    line=$(ssh-keygen -lf "$k" 2>/dev/null)
+    fp=$(echo "$line" | awk '{print $2}')              # "SHA256:..." biçimi
+    typ=$(echo "$line" | sed -E 's/.*\((.*)\)/\1/')    # sondaki parantez: ED25519/RSA/ECDSA
+    [ -n "$fp" ] && { printf "  %-10s %s\n" "${typ:-key}" "$fp"; shown=1; }
+  done
+  [ "$shown" = 0 ] && echo "  (host anahtarı bulunamadı; Remote Login açık mı?)"
+  echo ""
+  echo "Not: Uygulama Ed25519 anahtarını tercih eder; uygulamada görünen 'SHA256:...' ile"
+  echo "buradaki ed25519 satırı AYNI olmalı."
+  exit 0
+fi
+
 pass=0; warn=0; fail=0
 ok()   { printf "  \033[32m✓\033[0m %s\n" "$1"; pass=$((pass+1)); }
 wn()   { printf "  \033[33m!\033[0m %s\n" "$1"; warn=$((warn+1)); }
