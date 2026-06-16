@@ -18,10 +18,12 @@ SESSION="${1:-main}"
 # SSH (login olmayan) kabuklarda da tmux/claude/node PATH'te olsun:
 export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
 
-# Uzak (SSH) oturumlar Mac'in Keychain'ine erişemediği için Claude'un girişini
-# API anahtarıyla sağlıyoruz. Bu dosya varsa ANTHROPIC_API_KEY'i yükler.
+# Uzak (SSH) oturumlar Mac'in Keychain'ine erişemediği için Claude girişini bir
+# OAuth token'la sağlıyoruz (bkz. SETUP.md). Bu dosya varsa yüklenir.
 # (Mac'in kendi Terminal'ini etkilemez — sadece bu script'le açılan oturumlar.)
 [ -f "$HOME/.config/claude-remote/env" ] && . "$HOME/.config/claude-remote/env"
+# Token kopyalanırken araya kaçan boşluk/satırsonu 401'e yol açar → temizle.
+[ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && export CLAUDE_CODE_OAUTH_TOKEN="$(printf %s "$CLAUDE_CODE_OAUTH_TOKEN" | tr -d '[:space:]')"
 
 # -A: oturum varsa ona bağlan, yoksa oluştur. caffeinate Mac'i uyutmaz.
 # Login shell → home dizininde, profilin yüklü, claude PATH'te. claude'u SEN başlatırsın.

@@ -9,8 +9,9 @@
 set -euo pipefail
 export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
 
-# Uzak (SSH) oturumlar Keychain'e erişemez; Claude girişini API anahtarıyla sağla.
+# Uzak (SSH) oturumlar Keychain'e erişemez; Claude girişini OAuth token'la sağla (bkz. SETUP.md).
 [ -f "$HOME/.config/claude-remote/env" ] && . "$HOME/.config/claude-remote/env"
+[ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && export CLAUDE_CODE_OAUTH_TOKEN="$(printf %s "$CLAUDE_CODE_OAUTH_TOKEN" | tr -d '[:space:]')"
 
 SID="${1:?kullanım: claude-resume <oturum-id> [cwd]}"
 CWD="${2:-$HOME}"
