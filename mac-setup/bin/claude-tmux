@@ -16,11 +16,12 @@ ACCOUNT="${2:-}"
 # SSH (login olmayan) kabuklarda da tmux/claude/node PATH'te olsun:
 export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
 
-# Claude girişi (Keychain SSH'tan okunamaz → OAuth token). Önce seçilen hesap,
-# yoksa eski tek-hesap env dosyası. Token'ı oturumun kendi ortamına gömeriz.
+# Claude girişi (Keychain SSH'tan okunamaz → OAuth token). Öncelik:
+#   1) açıkça verilen hesap  2) varsayılan hesap  3) eski tek-hesap env dosyası.
 TOK=""
-if [ -n "$ACCOUNT" ] && command -v claude-account >/dev/null 2>&1; then
-  TOK="$(claude-account token "$ACCOUNT" 2>/dev/null || true)"
+if command -v claude-account >/dev/null 2>&1; then
+  [ -z "$ACCOUNT" ] && ACCOUNT="$(claude-account default 2>/dev/null | grep -v '^(' || true)"
+  [ -n "$ACCOUNT" ] && TOK="$(claude-account token "$ACCOUNT" 2>/dev/null || true)"
 fi
 if [ -z "$TOK" ] && [ -f "$HOME/.config/claude-remote/env" ]; then
   . "$HOME/.config/claude-remote/env"

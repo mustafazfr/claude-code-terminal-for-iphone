@@ -1,30 +1,52 @@
 #!/usr/bin/env bash
 #
 # claude-account <komut> ...
-#   list                         — kayıtlı hesapları listele
-#   add    <isim>                — yeni hesap ekle (setup-token'ı sen yapıştırırsın)
-#   remove <isim>                — hesabı sil
-#   token  <isim>                — o hesabın token'ını yazdır (scriptler kullanır)
+#   list                         — kayıtlı hesapları listele (varsayılan ★ ile)
+#   add     <isim>               — yeni hesap ekle (tarayıcı açılır, token otomatik yakalanır)
+#   remove  <isim>               — hesabı sil
+#   default [isim]               — varsayılan hesabı göster / ayarla
+#   check   [isim]               — hesabın token'ı geçerli mi / limit dolu mu (canlı test)
+#   token   <isim>               — o hesabın token'ını yazdır (scriptler kullanır)
 #
 # Birden çok Claude hesabını destekler: her hesabın OAuth token'ı ayrı dosyada
 # (~/.config/claude-remote/accounts/<isim>.token, chmod 600). Uygulama hangi hesabı
-# seçerse claude-tmux/claude-resume o hesabın token'ını yükler.
+# seçerse claude-tmux/claude-resume o hesabın token'ını yükler; seçim yoksa varsayılan.
 #
 set -euo pipefail
-DIR="$HOME/.config/claude-remote/accounts"
+ROOT="$HOME/.config/claude-remote"
+DIR="$ROOT/accounts"
+DEFAULT_FILE="$ROOT/default"
 mkdir -p "$DIR"; chmod 700 "$DIR"
 
 trim() { printf %s "$1" | tr -d '[:space:]'; }
 
+# Eski tek-hesap dosyasını (env) otomatik bir hesaba taşı (tek sistem olsun).
+_have_account=0
+for _f in "$DIR"/*.token; do [ -e "$_f" ] && { _have_account=1; break; }; done
+if [ "$_have_account" = 0 ] && [ -f "$ROOT/env" ]; then
+  # shellcheck disable=SC1090
+  . "$ROOT/env" 2>/dev/null || true
+  if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+    printf '%s\n' "$(trim "$CLAUDE_CODE_OAUTH_TOKEN")" > "$DIR/default.token"
+    chmod 600 "$DIR/default.token"
+    [ -f "$DEFAULT_FILE" ] || printf 'default\n' > "$DEFAULT_FILE"
+  fi
+fi
+
+default_name() { [ -f "$DEFAULT_FILE" ] && cat "$DEFAULT_FILE" || true; }
+
 case "${1:-list}" in
   list)
-    found=0
+    def="$(default_name)"; found=0
     for f in "$DIR"/*.token; do
       [ -e "$f" ] || continue
-      n=$(basename "$f" .token); echo "$n"; found=1
+      n=$(basename "$f" .token)
+      if [ "$n" = "$def" ]; then echo "$n  ★ varsayılan"; else echo "$n"; fi
+      found=1
     done
     [ "$found" = 0 ] && echo "(hesap yok — 'claude-account add <isim>' ile ekle)" >&2
     ;;
+
   add)
     name="${2:?kullanım: claude-account add <isim>}"
     export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
@@ -48,18 +70,52 @@ case "${1:-list}" in
     esac
     printf '%s\n' "$tok" > "$DIR/$name.token"
     chmod 600 "$DIR/$name.token"
-    echo "✅ '$name' eklendi."
+    # İlk hesabı otomatik varsayılan yap.
+    [ -f "$DEFAULT_FILE" ] || printf '%s\n' "$name" > "$DEFAULT_FILE"
+    echo "✅ '$name' eklendi.$([ "$(default_name)" = "$name" ] && echo ' (varsayılan)')"
     ;;
+
   remove)
     name="${2:?kullanım: claude-account remove <isim>}"
     rm -f "$DIR/$name.token" && echo "✅ '$name' silindi."
+    [ "$(default_name)" = "$name" ] && rm -f "$DEFAULT_FILE" && echo "  (varsayılan da kaldırıldı; 'claude-account default <isim>' ile yenisini seç)"
     ;;
+
+  default)
+    if [ -z "${2:-}" ]; then
+      d="$(default_name)"; [ -n "$d" ] && echo "$d" || echo "(varsayılan ayarlı değil)"
+    else
+      [ -f "$DIR/$2.token" ] || { echo "❌ '$2' diye bir hesap yok"; exit 1; }
+      printf '%s\n' "$2" > "$DEFAULT_FILE"
+      echo "✅ varsayılan hesap: $2"
+    fi
+    ;;
+
+  check)
+    export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
+    names="${2:-}"
+    [ -z "$names" ] && names="$(for f in "$DIR"/*.token; do [ -e "$f" ] && basename "$f" .token; done)"
+    for n in $names; do
+      t="$(trim "$(cat "$DIR/$n.token" 2>/dev/null)")"
+      [ -z "$t" ] && { echo "$n: ❌ token yok"; continue; }
+      # Küçük bir istekle hesabı yokla (READY → geçerli; 'limit' → dolu).
+      r="$(CLAUDE_CODE_OAUTH_TOKEN="$t" claude -p "reply with the single word OK" 2>&1 | head -1)"
+      case "$r" in
+        *OK*)            echo "$n: ✅ çalışıyor" ;;
+        *limit*|*Limit*) echo "$n: ⏳ limit dolu ($r)" ;;
+        *)               echo "$n: ⚠️  $r" ;;
+      esac
+    done
+    ;;
+
   token)
     name="${2:?}"
     f="$DIR/$name.token"
     [ -f "$f" ] || { echo "" ; exit 1; }
     trim "$(cat "$f")"
     ;;
+
   *)
-    echo "Kullanım: claude-account {list|add <isim>|remove <isim>|token <isim>}" >&2; exit 1;;
+    echo "Kullanım: claude-account {list|add <isim>|remove <isim>|default [isim]|check [isim]|token <isim>}" >&2
+    exit 1;;
 esac

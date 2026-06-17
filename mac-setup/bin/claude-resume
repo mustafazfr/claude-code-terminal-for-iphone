@@ -18,10 +18,11 @@ ACCOUNT="${3:-}"
 [ -d "$CWD" ] || CWD="$HOME"
 
 # Claude girişi: uzak (SSH) oturumlar Keychain'e erişemez → OAuth token (bkz. SETUP.md).
-# Önce seçilen hesap, yoksa eski tek-hesap env dosyası.
+# Öncelik: 1) açıkça verilen hesap  2) varsayılan hesap  3) eski tek-hesap env dosyası.
 TOK=""
-if [ -n "$ACCOUNT" ] && command -v claude-account >/dev/null 2>&1; then
-  TOK="$(claude-account token "$ACCOUNT" 2>/dev/null || true)"
+if command -v claude-account >/dev/null 2>&1; then
+  [ -z "$ACCOUNT" ] && ACCOUNT="$(claude-account default 2>/dev/null | grep -v '^(' || true)"
+  [ -n "$ACCOUNT" ] && TOK="$(claude-account token "$ACCOUNT" 2>/dev/null || true)"
 fi
 if [ -z "$TOK" ] && [ -f "$HOME/.config/claude-remote/env" ]; then
   . "$HOME/.config/claude-remote/env"

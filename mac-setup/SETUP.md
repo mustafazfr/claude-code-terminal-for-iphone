@@ -105,19 +105,28 @@ token — local Mac usage is unchanged. The file is git‑ignored. If the token 
 Anthropic Console. (Viewing **past chats** does not need this — those are plain files on disk; the token is
 only needed for Claude to actually talk to the model.)
 
-### Multiple Claude accounts (optional)
+### Multiple Claude accounts (recommended way to log in)
 
-If you use more than one Claude account, register each one and pick which to use from the app:
+`claude-account` is the clean way to manage logins — it runs `setup-token` for you (a browser opens;
+log in) and captures the token automatically, so there's nothing to copy by hand:
 
 ```bash
-claude-account add work       # paste a setup-token for that account
-claude-account add personal
-claude-account list
+claude-account add main        # browser opens → log in → token captured & stored
+claude-account add work        # add as many as you like
+claude-account list            # shows all accounts; the default is marked ★
+claude-account default work    # choose which account new sessions use by default
+claude-account check           # live-test every account: ✅ working / ⏳ rate-limited
+claude-account remove work     # delete one
 ```
 
-Each account's token is stored separately (`~/.config/claude-remote/accounts/<name>.token`, `600`). In the
-app's session list, an **Account** picker appears when more than one account exists; new terminals use the
-selected account. Tokens are trimmed automatically (stray whitespace causes 401s).
+Each account's token is stored separately (`~/.config/claude-remote/accounts/<name>.token`, `600`).
+In the app, an **Account** picker appears when more than one account exists; **Quick start** opens a
+separate persistent session per account, so switching the picker lands you in the right account's
+session. `claude-tmux`/`claude-resume` use the explicit account → the default → the legacy env file,
+in that order. Tokens are trimmed automatically (stray whitespace causes 401s).
+
+> Tokens work with your existing **Claude subscription at no extra cost** — they are *not* API keys
+> (API keys bill per token). If a token ever leaks, revoke it in the Anthropic Console.
 
 ## 6. Optional: push notifications
 

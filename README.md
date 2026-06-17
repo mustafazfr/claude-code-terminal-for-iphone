@@ -48,30 +48,64 @@ for the full threat model. In short:
 
 ## Setup — Mac side
 
-**One command** does the safe parts and prints the rest:
+**Fastest — one command** does the safe parts and prints the rest (re‑run anytime; idempotent):
 
 ```bash
+git clone https://github.com/mustafazfr/claude-code-terminal-for-iphone.git
+cd claude-code-terminal-for-iphone
 bash mac-setup/setup.sh
 ```
 
-It installs the helper scripts to `~/bin`, installs `tmux` (+ `bore` for CGNAT), writes a
-mobile‑friendly tmux config (touch scroll + big scrollback), checks Remote Login, and prints
-your exact remaining steps — add your phone's key, harden SSH, set the login token, pick a
-connectivity option. **Re‑run it anytime; it only fills in what's missing.** Keep the Mac
-plugged in (the scripts use `caffeinate` so it won't sleep).
+**Or do every step by hand** — the complete command set:
 
-Prefer to do it by hand, or want to know exactly what each script does? See the full walkthrough
-in [`mac-setup/SETUP.md`](mac-setup/SETUP.md).
+```bash
+# 1) Helper scripts → ~/bin, put ~/bin on PATH, install tmux (+ bore for CGNAT)
+mkdir -p ~/bin && cp mac-setup/bin/* ~/bin/ && chmod +x ~/bin/claude-* ~/bin/*.sh
+grep -q 'HOME/bin' ~/.zshrc || echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zshrc
+brew install tmux bore-cli
+cp mac-setup/tmux.conf.sample ~/.tmux.conf          # touch scroll + big scrollback
+
+# 2) Enable Remote Login (SSH)
+sudo systemsetup -setremotelogin on
+
+# 3) Add your phone's public key  (copy it from the app: Add Mac → SSH Key)
+mkdir -p ~/.ssh && chmod 700 ~/.ssh
+echo 'ssh-ed25519 AAAA... clauderemote@iphone' >> ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/authorized_keys
+
+# 4) Log in Claude for remote use  (subscription token, NOT an API key — opens a browser)
+claude-account add main                             # repeat for more accounts
+claude-account default main                         # which one new sessions use
+claude-account check                                # ✅ working / ⏳ rate-limited
+
+# 5) Lock SSH to key-only — run AFTER the key above works
+sudo bash ~/bin/harden-ssh.sh
+
+# 6) Audit your posture anytime
+claude-doctor
+```
+
+Keep the Mac plugged in (scripts use `caffeinate` so it won't sleep). Full reference, multiple
+accounts, push notifications: **[`mac-setup/SETUP.md`](mac-setup/SETUP.md)**.
 
 ## Setup — iOS app
 
+Prerequisites: Xcode (+ `xcode-select --install`), [XcodeGen](https://github.com/yonaskolb/XcodeGen),
+and on the iPhone **Developer Mode** on (Settings → Privacy & Security → Developer Mode) + "Trust" this Mac.
+
 ```bash
+brew install xcodegen                 # generates the .xcodeproj from project.yml
 cd ios-app
-./build.sh             # build for the simulator (verifies the toolchain)
-./install-device.sh    # build + install to a USB-connected iPhone (Developer Mode on)
+./build.sh                            # build for the simulator (verifies the toolchain)
+./install-device.sh                   # build + sign + install to a USB-connected iPhone
 ```
-Then in the app: **Add Mac** → choose **SSH Key** → copy the generated public key → add it to the
-Mac's `~/.ssh/authorized_keys`. Connect, authenticate with Face ID, pick a session, and you're in.
+Then in the app: **Add Mac** (enter host/port) → choose **SSH Key** → copy the generated public key →
+add it to the Mac's `~/.ssh/authorized_keys` (step 3 above). Connect, authenticate with Face ID, pick a
+session, and you're in.
+
+> Free Apple ID signing must be re‑run every 7 days (`./install-device.sh`). Building *over SSH* needs the
+> login keychain unlocked first (`security unlock-keychain ~/Library/Keychains/login.keychain-db`), since
+> code signing reads the signing key from it — not needed when you build at the Mac.
 
 > Building from the command line uses a couple of flags (see `build.sh`): a shared `SYMROOT` so the
 > Swift package modules resolve against each other, and classic (non‑explicit) modules. Xcode's GUI
