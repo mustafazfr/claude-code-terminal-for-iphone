@@ -111,6 +111,14 @@ final class SSHTerminalSession: ObservableObject {
 
     func send(text: String) { send(ArraySlice(Array(text.utf8))) }
 
+    /// Fare-tekerleği olayı gönder (SGR 1006 biçimi). Claude Code gibi alt-ekran TUI'leri
+    /// kendi geçmişlerini tmux scrollback'i yerine kendileri kaydırdığından, kaydırma onlara
+    /// tekerlek olarak iletilmeli. up=true → geçmişe (yukarı). Koordinat ekran içi olsun yeter.
+    func sendWheel(up: Bool) {
+        let button = up ? 64 : 65          // SGR fare: 64=tekerlek yukarı, 65=aşağı
+        send(text: "\u{1b}[<\(button);10;10M")
+    }
+
     func resize(cols: Int, rows: Int) {
         guard let writer else { return }
         Task { try? await writer.changeSize(cols: cols, rows: rows, pixelWidth: 0, pixelHeight: 0) }

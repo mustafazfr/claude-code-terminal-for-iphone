@@ -29,6 +29,17 @@ struct TerminalSurface: UIViewRepresentable {
         terminal.inputAccessoryView = nil
         context.coordinator.terminal = terminal
 
+        // İKİ PARMAK kaydırma → fare-tekerleği olayı. Claude TUI alt-ekran kullandığı ve
+        // tmux'ta geçmiş tutmadığı için kaydırma Claude'a tekerlek olarak gitmeli. İki parmak
+        // seçtik ki tek-parmak dokunma/seçim bozulmasın. (SwiftTerm'in kendi UIScrollView
+        // pan'i ile çakışmasın diye delegate ile eşzamanlı tanımaya izin veriyoruz.)
+        let scrollPan = UIPanGestureRecognizer(target: context.coordinator,
+                                               action: #selector(Coordinator.handleScrollPan(_:)))
+        scrollPan.minimumNumberOfTouches = 2
+        scrollPan.maximumNumberOfTouches = 2
+        scrollPan.delegate = context.coordinator
+        terminal.addGestureRecognizer(scrollPan)
+
         // Host -> terminal (onData ana iş parçacığında çağrılır, feed güvenli).
         session.onData = { [weak terminal] bytes in
             terminal?.feed(byteArray: bytes[...])
@@ -40,7 +51,7 @@ struct TerminalSurface: UIViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator(session: session, onReady: onReady) }
 
-    final class Coordinator: NSObject, TerminalViewDelegate {
+    final class Coordinator: NSObject, TerminalViewDelegate, UIGestureRecognizerDelegate {
         let session: SSHTerminalSession
         let onReady: (Int, Int) -> Void
         weak var terminal: TerminalView?
@@ -82,5 +93,34 @@ struct TerminalSurface: UIViewRepresentable {
         func clipboardCopy(source: TerminalView, content: Data) {}
         func iTermContent(source: TerminalView, content: ArraySlice<UInt8>) {}
         func rangeChanged(source: TerminalView, startY: Int, endY: Int) {}
+
+        // MARK: - İki parmak kaydırma → fare-tekerleği
+
+        /// Her ~22pt dikey hareket için bir tekerlek olayı gönderir. Aşağı sürüklemek
+        /// (parmak aşağı) geçmişe gitmek (tekerlek yukarı) demek — doğal kaydırma.
+        private var scrollAccum: CGFloat = 0
+
+        @objc func handleScrollPan(_ g: UIPanGestureRecognizer) {
+            guard let terminal else { return }
+            switch g.state {
+            case .began:
+                scrollAccum = 0
+            case .changed:
+                let dy = g.translation(in: terminal).y
+                g.setTranslation(.zero, in: terminal)
+                scrollAccum += dy
+                let step: CGFloat = 22
+                while scrollAccum >= step { scrollAccum -= step; session.sendWheel(up: true) }
+                while scrollAccum <= -step { scrollAccum += step; session.sendWheel(up: false) }
+            default:
+                scrollAccum = 0
+            }
+        }
+
+        // SwiftTerm'in kendi pan/scroll hareketleriyle aynı anda çalışabilsin.
+        func gestureRecognizer(_ g: UIGestureRecognizer,
+                               shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+            true
+        }
     }
 }

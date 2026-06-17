@@ -5,11 +5,9 @@ import PhotosUI
 /// Baytları doğrudan SSH'a yollar (uzak uç yankılar).
 struct InputAccessoryBar: View {
     let session: SSHTerminalSession
-    /// SFTP ile resim yüklemek + tmux kaydırma komutları için (PTY dışı kanal gerekir).
+    /// SFTP ile resim yüklemek için (terminal PTY'si dosya aktaramaz; ayrı kanal gerekir).
     let host: Host
     let password: String
-    /// Kaydırma komutlarının hedefi olan tmux oturum adı.
-    let tmuxSession: String
 
     @State private var photo: PhotosPickerItem?
     @State private var uploadState: UploadState = .idle
@@ -30,10 +28,10 @@ struct InputAccessoryBar: View {
                             .background(Color.accentColor.opacity(0.22))
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
-                    // Kaydırma: tmux copy-mode'u dışarıdan (exec kanalı) tetikler — mouse moduna
-                    // ya da hangi TUI'nin çalıştığına bağlı olmadan güvenilir. esc ile çıkılır.
-                    key("⤒") { scroll(up: true) }
-                    key("⤓") { scroll(up: false) }
+                    // Kaydırma: Claude'a fare-tekerleği gönder (alt-ekran TUI kendi geçmişini
+                    // kaydırır). Asıl yöntem iki parmakla kaydırma; bunlar yedek/ince ayar.
+                    key("⤒") { for _ in 0..<3 { session.sendWheel(up: true) } }
+                    key("⤓") { for _ in 0..<3 { session.sendWheel(up: false) } }
 
                     divider
                     key("esc")  { session.send(ArraySlice([0x1b])) }
@@ -80,22 +78,6 @@ struct InputAccessoryBar: View {
         .font(.caption2).lineLimit(1).truncationMode(.middle)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 10).padding(.vertical, 4)
-    }
-
-    /// tmux'u dışarıdan (exec kanalı) copy-mode'a sokup sayfa kaydırır. PTY'ye wheel
-    /// göndermekten daha sağlam: mouse moduna/odağa/çalışan TUI'ye bağlı değil.
-    /// Yukarı: copy-mode'a gir + sayfa yukarı. Aşağı: sayfa aşağı (copy-mode'da değilse etkisiz).
-    /// Yazmaya dönmek için esc (copy-mode'u iptal eder).
-    private func scroll(up: Bool) {
-        // Hedef: '=isim:' → '=' tam oturum eşleşmesi (mustafa- ≠ mustafa--2), sondaki ':'
-        // pane hedefi olarak çözülmesini sağlar (sadece '=isim' "can't find pane" verir).
-        let q = Shell.quote("=\(tmuxSession):")
-        let pathPrefix = #"export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"; "#
-        let cmd: String = up
-            ? pathPrefix + "tmux copy-mode -t \(q) 2>/dev/null; tmux send-keys -t \(q) -X page-up 2>/dev/null; true"
-            : pathPrefix + "tmux send-keys -t \(q) -X page-down 2>/dev/null; true"
-        let conn = ConnectionPool.connection(for: host, password: password)
-        Task { _ = try? await conn.run(cmd) }
     }
 
     /// Seçilen görseli SFTP ile Mac'e yükler, sonra yolunu prompt'a yazar (Claude okuyabilir).

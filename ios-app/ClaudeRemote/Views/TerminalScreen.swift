@@ -36,8 +36,7 @@ struct TerminalScreen: View {
                     initialCommand: startupCommand
                 )
             })
-            InputAccessoryBar(session: ssh, host: host, password: password,
-                              tmuxSession: tmuxSession ?? title)
+            InputAccessoryBar(session: ssh, host: host, password: password)
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
