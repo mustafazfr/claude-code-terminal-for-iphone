@@ -18,25 +18,31 @@ struct TerminalSurface: UIViewRepresentable {
         terminal.backgroundColor = .black
         terminal.nativeForegroundColor = .white
         terminal.nativeBackgroundColor = .black
-        // Parmakla kaydırma: SwiftTerm'de pan davranışı bu bayrağa bağlı —
-        //   true  → pan, terminalin scrollback'ini kaydırır (scrollDown); uygulama fare
-        //           isterse (örn. Claude TUI) olay ona gider ve kendi içinde kaydırır.
-        //   false → pan, OK TUŞU gönderir (kaydırma DEĞİL).
-        // Mobilde istediğimiz gerçek kaydırma olduğu için true. (Eskiden yanlışlıkla false'tı.)
-        terminal.allowMouseReporting = true
+        // Fare bildirimini kapat: SwiftTerm'in kendi pan'i Claude'a sürükle/tıkla göndermesin
+        // (kaydırırken istemeden seçim/garip davranış olmasın). Bizim wheel'imiz zaten doğrudan
+        // PTY'ye gider, bu bayraktan bağımsız — Claude kendi fare moduyla yorumlar.
+        terminal.allowMouseReporting = false
         // SwiftTerm'in KENDİ klavye-üstü çubuğunu kapat: bizim InputAccessoryBar'ımızla
         // çakışıyor (çift/karışık çubuk = "klavye berbat"). Tek çubuk kalsın → bizimki.
         terminal.inputAccessoryView = nil
         context.coordinator.terminal = terminal
 
-        // İKİ PARMAK kaydırma → fare-tekerleği olayı. Claude TUI alt-ekran kullandığı ve
-        // tmux'ta geçmiş tutmadığı için kaydırma Claude'a tekerlek olarak gitmeli. İki parmak
-        // seçtik ki tek-parmak dokunma/seçim bozulmasın. (SwiftTerm'in kendi UIScrollView
-        // pan'i ile çakışmasın diye delegate ile eşzamanlı tanımaya izin veriyoruz.)
+        // SwiftTerm'in mevcut pan recognizer'larını (seçim + UIScrollView) kapat ki TEK PARMAK
+        // kaydırma onlarla çakışmasın (yoksa seçim/ok-tuşu tetikler). Dokunma, çift/uzun-basma
+        // seçim ayrı gesture'lar — onlar kalır.
+        terminal.isScrollEnabled = false
+        for gr in terminal.gestureRecognizers ?? [] where gr is UIPanGestureRecognizer {
+            gr.isEnabled = false
+        }
+
+        // TEK PARMAK kaydırma → fare-tekerleği olayı. Claude TUI alt-ekran kullandığı ve
+        // tmux'ta geçmiş tutmadığı için kaydırma Claude'a tekerlek olarak gider, o da kendi
+        // sohbet geçmişini kaydırır. (Sonradan eklenen mouse-pan bayrak false olduğu için
+        // etkisiz; delegate ile eşzamanlı tanımaya da izin veriyoruz.)
         let scrollPan = UIPanGestureRecognizer(target: context.coordinator,
                                                action: #selector(Coordinator.handleScrollPan(_:)))
-        scrollPan.minimumNumberOfTouches = 2
-        scrollPan.maximumNumberOfTouches = 2
+        scrollPan.minimumNumberOfTouches = 1
+        scrollPan.maximumNumberOfTouches = 1
         scrollPan.delegate = context.coordinator
         terminal.addGestureRecognizer(scrollPan)
 
