@@ -14,6 +14,12 @@ struct SessionListView: View {
     @State private var selectedAccount: String = ""
     @State private var showEmpty = false
 
+    /// Hızlı başlat oturumunun adı = seçili hesap. Böylece her hesabın kendi kalıcı
+    /// oturumu olur; hesabı değiştirince doğru token'lı oturuma düşersin. Hesap yoksa "main".
+    private var quickSessionName: String {
+        selectedAccount.isEmpty ? "main" : selectedAccount
+    }
+
     var body: some View {
         List {
             switch controller.state {
@@ -83,7 +89,7 @@ struct SessionListView: View {
                 } header: {
                     Text("Hesap")
                 } footer: {
-                    Text("Yeni açılan terminaller bu Claude hesabıyla çalışır.")
+                    Text("Hızlı başlat her hesap için ayrı bir oturum açar. Mevcut bir oturum, hangi hesapla açıldıysa onunla devam eder — hesabı değiştirmek için o hesabı seçip yeni/hızlı oturum aç.")
                 }
             }
 
@@ -91,8 +97,8 @@ struct SessionListView: View {
                 Button { newName = ""; showNewSheet = true } label: {
                     Label("Yeni terminal aç", systemImage: "plus.circle.fill")
                 }
-                Button { terminal = TerminalTarget(name: "main") } label: {
-                    Label("Hızlı başlat (main)", systemImage: "bolt.fill")
+                Button { terminal = TerminalTarget(name: quickSessionName) } label: {
+                    Label("Hızlı başlat (\(quickSessionName))", systemImage: "bolt.fill")
                 }
                 NavigationLink {
                     ConversationsView(host: host, password: password)

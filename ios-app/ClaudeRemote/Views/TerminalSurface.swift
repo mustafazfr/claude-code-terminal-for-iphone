@@ -18,10 +18,12 @@ struct TerminalSurface: UIViewRepresentable {
         terminal.backgroundColor = .black
         terminal.nativeForegroundColor = .white
         terminal.nativeBackgroundColor = .black
-        // Parmakla kaydırma terminale "fare" olarak gitmesin; bunun yerine SwiftTerm'in
-        // kendi kaydırma/gezinme davranışını (scrollback + ok tuşu) tetiklesin. Mobilde
-        // kaydırma, fare bildiriminden çok daha önemli.
-        terminal.allowMouseReporting = false
+        // Parmakla kaydırma: SwiftTerm'de pan davranışı bu bayrağa bağlı —
+        //   true  → pan, terminalin scrollback'ini kaydırır (scrollDown); uygulama fare
+        //           isterse (örn. Claude TUI) olay ona gider ve kendi içinde kaydırır.
+        //   false → pan, OK TUŞU gönderir (kaydırma DEĞİL).
+        // Mobilde istediğimiz gerçek kaydırma olduğu için true. (Eskiden yanlışlıkla false'tı.)
+        terminal.allowMouseReporting = true
         context.coordinator.terminal = terminal
 
         // Host -> terminal (onData ana iş parçacığında çağrılır, feed güvenli).
