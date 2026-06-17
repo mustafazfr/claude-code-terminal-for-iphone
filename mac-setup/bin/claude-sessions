@@ -17,8 +17,17 @@ import os, sys, json, glob
 
 proj, limit = sys.argv[1], int(sys.argv[2])
 
+# Slash/yerel komut GÜRÜLTÜSÜ — gerçek oturumların da başında görünür (örn. /model, /effort,
+# /compact öncesi eklenen caveat). Bunları "özet" sanıp oturumu ELEME; ATLA ve altındaki
+# gerçek kullanıcı mesajını bulana dek devam et.
+NOISE_PREFIXES = (
+    "<local-command", "<command-name>", "<command-message>", "<command-args>",
+    "Caveat: The messages below were generated",
+)
+
 # Gerçek kullanıcı sohbeti olmayan iç/otomatik araç oturumlarını ele
 # (security-review, commit özetleme, hafıza sıkıştırma, kod analizi vb.).
+# Bunların İLK GERÇEK mesajı zaten bot komutudur → tüm oturum elenir.
 INTERNAL_PREFIXES = (
     "Apply maximum non-destructive compression",
     "You are summarizing a Claude Code session",
@@ -27,7 +36,6 @@ INTERNAL_PREFIXES = (
     "You previously flagged these candidate vulnerabilities",
     "You are an expert", "You are a ", "You are summarizing",
     "Summarize this Claude Code session",
-    "<command-name>", "<local-command",
 )
 import re
 def clean_summary(s):
@@ -59,7 +67,10 @@ for f in glob.glob(os.path.join(proj, "*", "*.jsonl")):
                         c = " ".join(p.get("text", "") for p in c
                                      if isinstance(p, dict) and p.get("type") == "text")
                     if isinstance(c, str) and c.strip():
-                        summary = c.strip()
+                        t = c.strip()
+                        # Komut gürültüsünü atla; gerçek kullanıcı mesajını bulana dek devam et.
+                        if not t.startswith(NOISE_PREFIXES):
+                            summary = t
                 if cwd and summary:
                     break
         if not summary:
