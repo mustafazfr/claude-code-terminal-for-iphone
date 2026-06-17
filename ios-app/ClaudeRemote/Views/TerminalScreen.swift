@@ -37,6 +37,7 @@ struct TerminalScreen: View {
                 )
             })
             InputAccessoryBar(session: ssh, host: host, password: password)
+            ComposerBar(session: ssh)
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
