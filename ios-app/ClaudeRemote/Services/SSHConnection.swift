@@ -37,6 +37,24 @@ actor SSHConnection {
         return String(buffer: buffer)
     }
 
+    /// Bir dosyayı SFTP ile uzak yola yükler (gerekirse klasörü oluşturur). Resim yükleme
+    /// için: telefondan seçilen görseli Mac'e koyar, sonra yolu terminale yazılır.
+    /// `remoteDir` ev dizinine göredir (SFTP varsayılanı). Tam yolu döndürür.
+    func upload(data: Data, remoteDir: String, fileName: String) async throws -> String {
+        let c = try await connectedClient()
+        return try await c.withSFTP { sftp in
+            // Klasör yoksa oluştur (varsa hatayı yut).
+            try? await sftp.createDirectory(atPath: remoteDir)
+            let path = "\(remoteDir)/\(fileName)"
+            let file = try await sftp.openFile(filePath: path, flags: [.write, .create, .truncate])
+            var buf = ByteBufferAllocator().buffer(capacity: data.count)
+            buf.writeBytes(data)
+            try await file.write(buf)
+            try await file.close()
+            return path
+        }
+    }
+
     func close() async {
         let c = client; client = nil
         try? await c?.close()

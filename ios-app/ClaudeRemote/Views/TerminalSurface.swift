@@ -24,6 +24,9 @@ struct TerminalSurface: UIViewRepresentable {
         //   false → pan, OK TUŞU gönderir (kaydırma DEĞİL).
         // Mobilde istediğimiz gerçek kaydırma olduğu için true. (Eskiden yanlışlıkla false'tı.)
         terminal.allowMouseReporting = true
+        // SwiftTerm'in KENDİ klavye-üstü çubuğunu kapat: bizim InputAccessoryBar'ımızla
+        // çakışıyor (çift/karışık çubuk = "klavye berbat"). Tek çubuk kalsın → bizimki.
+        terminal.inputAccessoryView = nil
         context.coordinator.terminal = terminal
 
         // Host -> terminal (onData ana iş parçacığında çağrılır, feed güvenli).
