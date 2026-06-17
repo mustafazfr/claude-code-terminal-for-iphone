@@ -48,14 +48,20 @@ for the full threat model. In short:
 
 ## Setup — Mac side
 
-1. **Enable Remote Login (SSH):** System Settings → General → Sharing → Remote Login → On.
-2. **Install the helper scripts** into `~/bin` (and make sure `~/bin` is on your `PATH`):
-   - `claude-tmux` — attach to / create a persistent tmux session (no auto‑start; you stay in control)
-   - `claude-sessions` / `claude-resume` — list past Claude Code chats and resume one
-   - `harden-ssh.sh` — lock SSH down to key‑only (run **after** adding your phone's key)
-   - optional: `claude-notify` (push via [ntfy](https://ntfy.sh)), `claude-ngrok`
-   See [`mac-setup/SETUP.md`](mac-setup/SETUP.md) for exact commands.
-3. **Keep the Mac reachable & awake:** keep it plugged in; the scripts use `caffeinate`.
+**One command** does the safe parts and prints the rest:
+
+```bash
+bash mac-setup/setup.sh
+```
+
+It installs the helper scripts to `~/bin`, installs `tmux` (+ `bore` for CGNAT), writes a
+mobile‑friendly tmux config (touch scroll + big scrollback), checks Remote Login, and prints
+your exact remaining steps — add your phone's key, harden SSH, set the login token, pick a
+connectivity option. **Re‑run it anytime; it only fills in what's missing.** Keep the Mac
+plugged in (the scripts use `caffeinate` so it won't sleep).
+
+Prefer to do it by hand, or want to know exactly what each script does? See the full walkthrough
+in [`mac-setup/SETUP.md`](mac-setup/SETUP.md).
 
 ## Setup — iOS app
 

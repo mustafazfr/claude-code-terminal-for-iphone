@@ -1,6 +1,20 @@
 # Mac setup
 
-No app runs on the Mac — just a few small scripts plus settings. Run these from the repo root.
+No app runs on the Mac — just a few small scripts plus settings.
+
+## Quick start (recommended)
+
+From the repo root:
+
+```bash
+bash mac-setup/setup.sh
+```
+
+This automates steps 1–4 below (helper scripts, `tmux`/`bore`, PATH, mobile tmux config, Remote
+Login check) and prints exactly what's left for you to do by hand (your phone's key, hardening,
+the login token, connectivity). It's idempotent — safe to re-run; it only fills in what's missing.
+
+The rest of this file is the **manual walkthrough / reference** for what that script does, step by step.
 
 ## 1. Install the helper scripts
 
