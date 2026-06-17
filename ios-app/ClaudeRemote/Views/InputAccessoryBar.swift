@@ -87,7 +87,9 @@ struct InputAccessoryBar: View {
     /// Yukarı: copy-mode'a gir + sayfa yukarı. Aşağı: sayfa aşağı (copy-mode'da değilse etkisiz).
     /// Yazmaya dönmek için esc (copy-mode'u iptal eder).
     private func scroll(up: Bool) {
-        let q = Shell.quote("=\(tmuxSession)")
+        // Hedef: '=isim:' → '=' tam oturum eşleşmesi (mustafa- ≠ mustafa--2), sondaki ':'
+        // pane hedefi olarak çözülmesini sağlar (sadece '=isim' "can't find pane" verir).
+        let q = Shell.quote("=\(tmuxSession):")
         let pathPrefix = #"export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"; "#
         let cmd: String = up
             ? pathPrefix + "tmux copy-mode -t \(q) 2>/dev/null; tmux send-keys -t \(q) -X page-up 2>/dev/null; true"
