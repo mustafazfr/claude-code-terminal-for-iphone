@@ -1,21 +1,33 @@
 #!/usr/bin/env bash
 #
-# claude-resume <oturum-id> [cwd]
+# claude-resume <oturum-id> [cwd] [account]
 #
 # Geçmiş bir Claude Code sohbetine, doğru proje dizininde ve kalıcı bir tmux
 # oturumunda devam eder. Aynı sohbete tekrar dokununca aynı tmux oturumuna bağlanır
 # (çift başlatmaz). caffeinate ile Mac uyumaz.
 #
+# account verilirse o Claude hesabının OAuth token'ı kullanılır (çoklu hesap;
+# bkz. claude-account). Verilmezse eski tek-hesap env dosyasına düşer.
+#
 set -euo pipefail
 export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"
 
-# Uzak (SSH) oturumlar Keychain'e erişemez; Claude girişini OAuth token'la sağla (bkz. SETUP.md).
-[ -f "$HOME/.config/claude-remote/env" ] && . "$HOME/.config/claude-remote/env"
-[ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && export CLAUDE_CODE_OAUTH_TOKEN="$(printf %s "$CLAUDE_CODE_OAUTH_TOKEN" | tr -d '[:space:]')"
-
-SID="${1:?kullanım: claude-resume <oturum-id> [cwd]}"
+SID="${1:?kullanım: claude-resume <oturum-id> [cwd] [account]}"
 CWD="${2:-$HOME}"
+ACCOUNT="${3:-}"
 [ -d "$CWD" ] || CWD="$HOME"
+
+# Claude girişi: uzak (SSH) oturumlar Keychain'e erişemez → OAuth token (bkz. SETUP.md).
+# Önce seçilen hesap, yoksa eski tek-hesap env dosyası.
+TOK=""
+if [ -n "$ACCOUNT" ] && command -v claude-account >/dev/null 2>&1; then
+  TOK="$(claude-account token "$ACCOUNT" 2>/dev/null || true)"
+fi
+if [ -z "$TOK" ] && [ -f "$HOME/.config/claude-remote/env" ]; then
+  . "$HOME/.config/claude-remote/env"
+  TOK="${CLAUDE_CODE_OAUTH_TOKEN:-}"
+fi
+TOK="$(printf %s "$TOK" | tr -d '[:space:]')"
 
 # tmux oturum adı: sohbet id'sinin ilk 8 hanesi (stabil, çift açmayı önler).
 TNAME="chat-${SID:0:8}"
@@ -23,4 +35,12 @@ TNAME="chat-${SID:0:8}"
 # Komutu çift-tırnakla kur (eski bash'lerde olmayan ${..@Q} kullanma). CWD boşluk
 # içerebilir → "..." ile sarılı; SID bir UUID, güvenli.
 CMD="cd \"$CWD\" && caffeinate -dis claude --resume \"$SID\""
-exec tmux new-session -A -s "$TNAME" "$CMD"
+
+# Token'ı `-e` ile YENİ oturumun ortamına koy. KRİTİK: tmux server zaten çalışıyorsa
+# env-prefix/export token'ı yeni oturuma TAŞIMAZ → claude Keychain'e düşer (SSH'ta
+# kilitli) → login açılır. `-e` bunu atlar (tmux 3.2+). Boş token'ı hiç ekleme.
+if [ -n "$TOK" ]; then
+  exec tmux new-session -A -e "CLAUDE_CODE_OAUTH_TOKEN=$TOK" -s "$TNAME" "$CMD"
+else
+  exec tmux new-session -A -s "$TNAME" "$CMD"
+fi

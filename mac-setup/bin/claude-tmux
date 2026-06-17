@@ -28,7 +28,15 @@ if [ -z "$TOK" ] && [ -f "$HOME/.config/claude-remote/env" ]; then
 fi
 TOK="$(printf %s "$TOK" | tr -d '[:space:]')"   # kopyalama boşluklarını temizle (401 önleme)
 
-# -A: oturum varsa ona bağlan, yoksa oluştur. caffeinate Mac'i uyutmaz.
-# Token'ı tmux oturumunun ortamına koy (o oturumdaki tüm claude çağrıları kullanır).
-exec env CLAUDE_CODE_OAUTH_TOKEN="$TOK" \
-  tmux new-session -A -s "$SESSION" "caffeinate -dis ${SHELL:-/bin/zsh} -l"
+CMD="caffeinate -dis ${SHELL:-/bin/zsh} -l"
+
+# Token'ı tmux'a `-e` ile YENİ oturumun ortamına koy. KRİTİK: `env VAR=x tmux ...`
+# yöntemi, tmux SERVER ZATEN ÇALIŞIYORSA token'ı yeni oturuma TAŞIMAZ (server kendi
+# ortamını kullanır) → claude Keychain'e düşer, SSH'ta kilitli → login açılır. `-e`
+# bunu atlar (tmux 3.2+). Boş token'ı hiç ekleme (boş token claude'u bozar).
+# -A: oturum varsa ona bağlan (var olan oturum kendi token'ını korur — bu kaçınılmaz).
+if [ -n "$TOK" ]; then
+  exec tmux new-session -A -e "CLAUDE_CODE_OAUTH_TOKEN=$TOK" -s "$SESSION" "$CMD"
+else
+  exec tmux new-session -A -s "$SESSION" "$CMD"
+fi
