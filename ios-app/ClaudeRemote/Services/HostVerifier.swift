@@ -47,9 +47,10 @@ final class HostVerifier: ObservableObject {
         }
     }
 
-    /// Host anahtarını kaydeden ama bağlantıyı tamamlamaya çalışan probe. Anahtar,
-    /// kullanıcı kimlik doğrulamasından ÖNCE (transport el sıkışmasında) görülür; bu yüzden
-    /// auth başarısız olsa bile parmak izini elde ederiz.
+    /// Host anahtarının parmak izini yoklar. Anahtar, kullanıcı kimlik doğrulamasından ÖNCE
+    /// (transport el sıkışmasında) görülür; RecordingValidator onu yakalar ve el sıkışmayı
+    /// REDDEDER — böylece kimlik bilgisi (parola/anahtar) doğrulanmamış sunucuya gönderilmez.
+    /// connect() bu yüzden hata fırlatır; parmak izini yine de okuruz.
     private func probeFingerprint(host: Host, password: String) async throws -> String {
         let recorder = RecordingValidator()
         let auth = try SSHAuth.method(for: host, password: password)
@@ -62,7 +63,7 @@ final class HostVerifier: ObservableObject {
             )
             try? await client.close()
         } catch {
-            // auth/başka sebeple kapanmış olabilir; yine de parmak izini almış olabiliriz.
+            // BEKLENEN: el sıkışmayı bilerek reddettik. Parmak izi yine de kaydedilmiş olur.
         }
         guard let fp = recorder.fingerprint else {
             throw ProbeFailed()
@@ -75,7 +76,14 @@ final class HostVerifier: ObservableObject {
     }
 }
 
-/// Sunucu anahtarını kaydeden, bağlantıya izin veren doğrulayıcı (yalnızca probe için).
+/// Sunucu anahtarının parmak izini kaydeder, sonra el sıkışmayı KASITLI olarak reddeder.
+///
+/// GÜVENLİK (kritik): Host anahtarı, kullanıcı kimlik doğrulamasından ÖNCE — transport
+/// key-exchange aşamasında — gelir. Parmak izini tam orada yakalayıp bağlantıyı hemen
+/// keseriz; böylece parola / anahtar imzası DOĞRULANMAMIŞ bir sunucuya HİÇBİR ZAMAN
+/// gönderilmez. Eskiden burada anahtar 'kabul edilip' (succeed) auth'a devam ediliyordu;
+/// bu, ilk bağlantıda MITM'e karşı kimlik/oturum hırsızlığı açığıydı (.acceptAnything ile
+/// aynı davranış). Artık kaydet → reddet: parmak izini alırız, kimlik bilgisi sızmaz.
 /// validateHostKey NIO event-loop thread'inde çağrılır; kilitle koru.
 private final class RecordingValidator: NIOSSHClientServerAuthenticationDelegate, @unchecked Sendable {
     private let lock = NSLock()
@@ -85,6 +93,7 @@ private final class RecordingValidator: NIOSSHClientServerAuthenticationDelegate
     func validateHostKey(hostKey: NIOSSHPublicKey, validationCompletePromise: EventLoopPromise<Void>) {
         let fp = HostKeyFingerprint.make(hostKey)
         lock.lock(); _fp = fp; lock.unlock()
-        validationCompletePromise.succeed(())
+        // Parmak izini aldık; auth'a geçmeden bağlantıyı reddet ki kimlik bilgisi sızmasın.
+        validationCompletePromise.fail(HostKeyUnverified(fingerprint: fp))
     }
 }
