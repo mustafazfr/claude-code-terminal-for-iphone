@@ -12,6 +12,7 @@ struct SessionListView: View {
     @State private var newName = ""
     @State private var accounts: [String] = []
     @State private var selectedAccount: String = ""
+    @State private var showEmpty = false
 
     var body: some View {
         List {
@@ -40,10 +41,13 @@ struct SessionListView: View {
                     }
                 }
 
-            case .loaded(let sessions):
+            case .loaded(let all):
+                let sessions = showEmpty ? all : all.filter { $0.isActive }
                 Section {
                     if sessions.isEmpty {
-                        Text("Açık oturum yok. Aşağıdan yeni bir tane başlat.")
+                        Text(all.isEmpty
+                             ? "Açık oturum yok. Aşağıdan yeni bir tane başlat."
+                             : "Çalışan bir şey yok. Boş kabukları görmek için aşağıdan aç.")
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(sessions) { s in
@@ -59,9 +63,15 @@ struct SessionListView: View {
                         }
                     }
                 } header: {
-                    Text("Açık terminaller (tmux)")
+                    Text("Açık terminaller")
                 } footer: {
-                    Text("Bir oturuma dokun → kaldığın yerden devam et. Oturumlar Mac'te yaşar; bağlantı kopsa bile kapanmaz. Sola kaydır → kapat.")
+                    Text("Dokun → kaldığın yerden devam et. Sola kaydır → kapat. Oturumlar Mac'te yaşar; bağlantı kopsa bile kapanmaz.")
+                }
+
+                if all.contains(where: { !$0.isActive }) {
+                    Section {
+                        Toggle("Boş kabukları da göster", isOn: $showEmpty)
+                    }
                 }
             }
 
@@ -103,6 +113,13 @@ struct SessionListView: View {
         .navigationDestination(item: $terminal) { target in
             TerminalScreen(host: host, password: password, title: target.name, account: selectedAccount)
         }
+        .onChange(of: terminal) { _, newValue in
+            // Terminalden geri dönünce (newValue == nil) listeyi tazele: yeni açılan/kapanan
+            // oturumlar anında yansısın ("eskiler geliyor" sorununu çözer).
+            if newValue == nil {
+                Task { await controller.load(host: host, password: password) }
+            }
+        }
         .alert("Yeni terminal", isPresented: $showNewSheet) {
             TextField("Oturum adı (örn. proje1)", text: $newName)
                 .textInputAutocapitalization(.never)
@@ -142,12 +159,18 @@ struct TerminalTarget: Identifiable, Hashable {
 private struct SessionRow: View {
     let session: TmuxSession
 
+    private var icon: String {
+        if session.command == "claude" || session.command == "claude.exe" { return "sparkle" }
+        return session.isActive ? "terminal.fill" : "terminal"
+    }
+
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "terminal.fill").foregroundStyle(.tint)
+            Image(systemName: icon)
+                .foregroundStyle(session.isActive ? Color.accentColor : .secondary)
             VStack(alignment: .leading, spacing: 2) {
                 Text(session.name).font(.body)
-                Text("\(session.windows) pencere\(session.attached ? " · bağlı" : "")")
+                Text(session.activityLabel + (session.attached ? " · bağlı" : ""))
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()

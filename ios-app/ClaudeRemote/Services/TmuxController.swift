@@ -17,9 +17,9 @@ final class TmuxController: ObservableObject {
         state = .loading
         do {
             let conn = ConnectionPool.connection(for: host, password: password)
-            // Ayraç '|' (TAB raw-string'de bozuluyordu). PATH'e Homebrew'i ekle, hata yut.
+            // Ayraç '|'. 4. alan: o oturumun aktif pane'inde çalışan komut (boş kabuk ayıklama).
             let cmd = #"export PATH="/opt/homebrew/bin:$HOME/.local/bin:$PATH"; "#
-                + "tmux list-sessions -F '#{session_name}|#{session_windows}|#{session_attached}' 2>/dev/null; true"
+                + "tmux list-sessions -F '#{session_name}|#{session_windows}|#{session_attached}|#{pane_current_command}' 2>/dev/null; true"
             let output = try await conn.run(cmd)
             state = .loaded(Self.parse(output))
         } catch {
@@ -46,7 +46,7 @@ final class TmuxController: ObservableObject {
         await load(host: host, password: password)
     }
 
-    /// `#{session_name}|#{session_windows}|#{session_attached}` satırlarını parse eder.
+    /// `#{session_name}|#{session_windows}|#{session_attached}|#{pane_current_command}` parse.
     static func parse(_ output: String) -> [TmuxSession] {
         output.split(whereSeparator: \.isNewline).compactMap { line in
             let parts = line.components(separatedBy: "|")
@@ -54,7 +54,8 @@ final class TmuxController: ObservableObject {
             return TmuxSession(
                 name: parts[0],
                 windows: Int(parts[1]) ?? 1,
-                attached: parts[2].trimmingCharacters(in: .whitespaces) == "1"
+                attached: parts[2].trimmingCharacters(in: .whitespaces) == "1",
+                command: parts.count >= 4 ? parts[3].trimmingCharacters(in: .whitespaces) : ""
             )
         }
     }
