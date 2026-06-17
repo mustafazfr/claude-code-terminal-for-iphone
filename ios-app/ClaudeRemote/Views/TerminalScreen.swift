@@ -12,6 +12,9 @@ struct TerminalScreen: View {
     var initialCommand: String?
     /// Bu oturumda kullanılacak Claude hesabı (claude-account adı). Boş → varsayılan.
     var account: String = ""
+    /// Gerçek tmux oturum adı (kaydırma komutlarının hedefi). nil → `title` (çoğu yol).
+    /// Resume yolunda farklıdır (`chat-<id8>`), bu yüzden açıkça geçilir.
+    var tmuxSession: String?
 
     @StateObject private var ssh = SSHTerminalSession()
 
@@ -33,7 +36,8 @@ struct TerminalScreen: View {
                     initialCommand: startupCommand
                 )
             })
-            InputAccessoryBar(session: ssh, host: host, password: password)
+            InputAccessoryBar(session: ssh, host: host, password: password,
+                              tmuxSession: tmuxSession ?? title)
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)

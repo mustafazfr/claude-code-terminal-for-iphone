@@ -111,16 +111,6 @@ final class SSHTerminalSession: ObservableObject {
 
     func send(text: String) { send(ArraySlice(Array(text.utf8))) }
 
-    /// Terminali kaydır. Oturum tmux içinde ve `mouse on` olduğundan, fare-tekerleği SGR
-    /// dizisi göndermek tmux'u (ya da fareyi yöneten TUI'yi, örn. Claude) kaydırır — SwiftTerm
-    /// iOS pan'i alt-ekranda kaydıramadığı için en güvenilir yol bu.
-    /// up=true → geçmişe (yukarı). `lines` her dokunuşta kaç tekerlek olayı.
-    func scroll(up: Bool, lines: Int = 3) {
-        let button = up ? 64 : 65                 // SGR fare: 64=tekerlek yukarı, 65=aşağı
-        let wheel = "\u{1b}[<\(button);2;2M"      // pane içinde güvenli bir koordinat (2,2)
-        send(text: String(repeating: wheel, count: max(1, lines)))
-    }
-
     func resize(cols: Int, rows: Int) {
         guard let writer else { return }
         Task { try? await writer.changeSize(cols: cols, rows: rows, pixelWidth: 0, pixelHeight: 0) }

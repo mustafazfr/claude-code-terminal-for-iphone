@@ -52,7 +52,9 @@ struct ConversationsView: View {
             TerminalScreen(
                 host: host, password: password,
                 title: target.chat.projectName,
-                initialCommand: "claude-resume \(Shell.quote(target.chat.sessionId)) \(Shell.quote(target.chat.cwd))"
+                initialCommand: "claude-resume \(Shell.quote(target.chat.sessionId)) \(Shell.quote(target.chat.cwd))",
+                // claude-resume oturumu 'chat-<id ilk 8>' olarak açar; kaydırma bunu hedeflemeli.
+                tmuxSession: "chat-\(target.chat.sessionId.prefix(8))"
             )
         }
         .task { await controller.load(host: host, password: password) }
